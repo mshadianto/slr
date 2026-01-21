@@ -674,16 +674,23 @@ QUALITY DISTRIBUTION
                         "research_question": st.session_state.slr_state.get("research_question", research_title or ""),
                     }
 
-                    # Generate narrative
-                    narratives = asyncio.run(generate_results_chapter(
-                        slr_results=slr_results,
-                        use_llm=use_llm and bool(settings.anthropic_api_key),
-                        research_title=research_title or "Systematic Literature Review"
-                    ))
+                    # Generate narrative using NarrativeGenerator directly
+                    async def generate_narratives():
+                        anthropic_client = None
+                        if use_llm and settings.anthropic_api_key:
+                            try:
+                                from anthropic import AsyncAnthropic
+                                anthropic_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
+                            except ImportError:
+                                pass
 
+                        generator = NarrativeGenerator(anthropic_client=anthropic_client)
+                        narratives = await generator.generate_full_chapter(slr_results)
+                        return generator, narratives
+
+                    generator, narratives = asyncio.run(generate_narratives())
                     st.session_state.generated_narratives = narratives
-                    st.session_state.narrative_generator = NarrativeGenerator()
-                    st.session_state.narrative_generator.narratives = narratives
+                    st.session_state.narrative_generator = generator
 
                     st.success("Narrative chapter generated successfully!")
 

@@ -130,6 +130,20 @@ class NarrativeGenerator:
         """
         sections = {}
 
+        # Extract papers with fallback keys (support different naming conventions)
+        papers = (
+            slr_results.get('acquired_papers') or
+            slr_results.get('synthesis_ready') or
+            slr_results.get('included_papers') or
+            []
+        )
+
+        quality_papers = (
+            slr_results.get('quality_assessed_papers') or
+            slr_results.get('assessed_papers') or
+            papers
+        )
+
         # 1. PRISMA Flow Narrative
         logger.info("Generating PRISMA flow narrative...")
         sections[NarrativeSection.PRISMA_FLOW] = await self.generate_prisma_narrative(
@@ -140,19 +154,19 @@ class NarrativeGenerator:
         # 2. Study Characteristics
         logger.info("Generating study characteristics narrative...")
         sections[NarrativeSection.STUDY_CHARACTERISTICS] = await self.generate_characteristics_narrative(
-            slr_results.get('acquired_papers', [])
+            papers
         )
 
         # 3. Quality Assessment
         logger.info("Generating quality assessment narrative...")
         sections[NarrativeSection.QUALITY_ASSESSMENT] = await self.generate_quality_narrative(
-            slr_results.get('quality_assessed_papers', [])
+            quality_papers
         )
 
         # 4. Thematic Synthesis
         logger.info("Generating thematic synthesis narrative...")
         sections[NarrativeSection.THEMATIC_SYNTHESIS] = await self.generate_thematic_narrative(
-            slr_results.get('acquired_papers', []),
+            papers,
             slr_results.get('themes', [])
         )
 
