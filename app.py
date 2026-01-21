@@ -30,6 +30,7 @@ from config import settings
 from agents.state import SLRState, PRISMAStats, AgentStatus, create_initial_state
 from agents.orchestrator import SLROrchestrator
 from agents.narrative_generator import NarrativeGenerator, generate_results_chapter
+from agents.narrative_orchestrator import NarrativeOrchestrator
 
 # Page configuration
 st.set_page_config(
@@ -127,6 +128,9 @@ def init_session_state():
         "narrative_generator": None,
         "generated_narratives": None,
         "narrative_generating": False,
+        "report_orchestrator": None,
+        "full_report_chapters": None,
+        "report_generating": False,
     }
 
     for key, default in defaults.items():
@@ -787,6 +791,209 @@ QUALITY DISTRIBUTION
                         "Full Narrative (copy from here)",
                         value=full_text,
                         height=400
+                    )
+
+        # Full Research Report Section
+        st.divider()
+        st.subheader("📚 Generate Full Research Report (5 Chapters)")
+        st.markdown("""
+        <div style="background: #EEF2FF; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+            <p style="margin: 0; color: #3730A3;">
+                <strong>Full Report Generator</strong> akan menyusun laporan penelitian lengkap 5 bab
+                dalam bahasa Indonesia formal akademik standar jurnal Q1.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        report_cols = st.columns([2, 1, 1])
+
+        with report_cols[0]:
+            report_title = st.text_input(
+                "Judul Penelitian Lengkap",
+                value=st.session_state.slr_state.get("research_question", "") if st.session_state.slr_state else "",
+                placeholder="Contoh: Systematic Review Penerapan AI dalam Diagnosis Kanker",
+                key="report_title_input"
+            )
+
+        with report_cols[1]:
+            use_llm_report = st.checkbox(
+                "Gunakan Claude AI",
+                value=True,
+                help="Menggunakan Claude AI untuk narasi lebih natural",
+                key="use_llm_report"
+            )
+
+        with report_cols[2]:
+            selected_chapters = st.multiselect(
+                "Pilih Bab",
+                options=["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5"],
+                default=["Bab 1", "Bab 3", "Bab 4", "Bab 5"],
+                help="Pilih bab yang ingin di-generate"
+            )
+
+        generate_report_btn = st.button(
+            "📝 Generate Full Report",
+            type="primary",
+            use_container_width=True,
+            disabled=st.session_state.report_generating,
+            key="generate_report_btn"
+        )
+
+        if generate_report_btn and st.session_state.slr_state:
+            st.session_state.report_generating = True
+
+            with st.spinner("Generating full research report... This may take a few minutes."):
+                try:
+                    # Prepare data
+                    scopus_metadata = {
+                        "total_results": st.session_state.prisma_stats.identified,
+                        "year_range": f"{st.session_state.slr_state.get('date_range', (2018, 2024))}",
+                        "top_sources": [],
+                        "publication_trend": {}
+                    }
+
+                    extraction_table = st.session_state.slr_state.get("synthesis_ready", [])
+                    if not extraction_table:
+                        extraction_table = st.session_state.slr_state.get("assessed_papers", [])
+
+                    prisma_stats = {
+                        "identified": st.session_state.prisma_stats.identified,
+                        "duplicates_removed": st.session_state.prisma_stats.duplicates_removed,
+                        "screened": st.session_state.prisma_stats.screened,
+                        "excluded_screening": st.session_state.prisma_stats.excluded_screening,
+                        "sought_retrieval": st.session_state.prisma_stats.sought_retrieval,
+                        "not_retrieved": st.session_state.prisma_stats.not_retrieved,
+                        "assessed_eligibility": st.session_state.prisma_stats.assessed_eligibility,
+                        "excluded_eligibility": st.session_state.prisma_stats.excluded_eligibility,
+                        "included_synthesis": st.session_state.prisma_stats.included_synthesis,
+                    }
+
+                    papers = st.session_state.slr_state.get("synthesis_ready", [])
+
+                    # Initialize orchestrator
+                    api_key = settings.anthropic_api_key if use_llm_report else None
+                    orchestrator = NarrativeOrchestrator(api_key=api_key)
+
+                    # Generate selected chapters
+                    progress_bar = st.progress(0)
+                    chapter_map = {
+                        "Bab 1": ("generate_bab_1_pendahuluan", [report_title, scopus_metadata]),
+                        "Bab 2": ("generate_bab_2_tinjauan_pustaka", [report_title, papers]),
+                        "Bab 3": ("generate_bab_3_metodologi", [prisma_stats]),
+                        "Bab 4": ("generate_bab_4_hasil_pembahasan", [report_title, extraction_table]),
+                        "Bab 5": ("generate_bab_5_kesimpulan", [report_title]),
+                    }
+
+                    for i, chapter_name in enumerate(selected_chapters):
+                        if chapter_name in chapter_map:
+                            method_name, args = chapter_map[chapter_name]
+                            method = getattr(orchestrator, method_name)
+                            st.text(f"Generating {chapter_name}...")
+                            method(*args)
+                            progress_bar.progress((i + 1) / len(selected_chapters))
+
+                    st.session_state.report_orchestrator = orchestrator
+                    st.session_state.full_report_chapters = orchestrator.chapters
+
+                    st.success(f"Full report generated! {len(orchestrator.chapters)} chapters created.")
+
+                except Exception as e:
+                    st.error(f"Error generating report: {str(e)}")
+                finally:
+                    st.session_state.report_generating = False
+                    st.rerun()
+
+        # Display Full Report
+        if st.session_state.full_report_chapters:
+            st.divider()
+            st.subheader("📖 Full Report Preview")
+
+            chapters = st.session_state.full_report_chapters
+
+            # Create tabs for each chapter
+            chapter_titles = {
+                "bab_1": "Bab I Pendahuluan",
+                "bab_2": "Bab II Tinjauan Pustaka",
+                "bab_3": "Bab III Metodologi",
+                "bab_4": "Bab IV Hasil",
+                "bab_5": "Bab V Kesimpulan"
+            }
+
+            available_tabs = []
+            available_keys = []
+            for key, chapter in chapters.items():
+                tab_name = chapter_titles.get(key.value if hasattr(key, 'value') else str(key), str(key))
+                available_tabs.append(tab_name)
+                available_keys.append(key)
+
+            if available_tabs:
+                report_tabs = st.tabs(available_tabs)
+
+                for tab, key in zip(report_tabs, available_keys):
+                    with tab:
+                        chapter = chapters[key]
+                        st.markdown(f"### {chapter.title}")
+                        st.markdown(chapter.content)
+                        st.caption(f"Word count: {chapter.word_count}")
+
+            # Export Full Report
+            st.divider()
+            st.subheader("📤 Export Full Report")
+            report_export_cols = st.columns(3)
+
+            with report_export_cols[0]:
+                if st.session_state.report_orchestrator:
+                    md_report = st.session_state.report_orchestrator.export_to_markdown()
+                    st.download_button(
+                        label="📄 Download Markdown",
+                        data=md_report,
+                        file_name="laporan_penelitian_lengkap.md",
+                        mime="text/markdown",
+                        use_container_width=True,
+                        key="download_full_md"
+                    )
+
+            with report_export_cols[1]:
+                word_report_btn = st.button(
+                    "📝 Generate Word Document",
+                    use_container_width=True,
+                    key="generate_full_word"
+                )
+
+                if word_report_btn and st.session_state.report_orchestrator:
+                    try:
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+                            tmp_path = tmp.name
+
+                        success = st.session_state.report_orchestrator.export_to_word(tmp_path)
+
+                        if success:
+                            with open(tmp_path, "rb") as f:
+                                word_data = f.read()
+
+                            st.download_button(
+                                label="⬇️ Download Word File",
+                                data=word_data,
+                                file_name="laporan_penelitian_lengkap.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                use_container_width=True,
+                                key="download_full_docx"
+                            )
+                            os.unlink(tmp_path)
+                        else:
+                            st.warning("python-docx not installed. Install with: pip install python-docx")
+                    except Exception as e:
+                        st.error(f"Error creating Word document: {str(e)}")
+
+            with report_export_cols[2]:
+                if st.button("📋 Show Full Report Text", use_container_width=True, key="show_full_report"):
+                    full_report = st.session_state.report_orchestrator.export_to_markdown()
+                    st.text_area(
+                        "Full Report (copy from here)",
+                        value=full_report,
+                        height=500,
+                        key="full_report_text"
                     )
 
     # Footer
