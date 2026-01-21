@@ -29,6 +29,7 @@ load_dotenv()
 from config import settings
 from agents.state import SLRState, PRISMAStats, AgentStatus, create_initial_state
 from agents.orchestrator import SLROrchestrator
+from agents.narrative_generator import NarrativeGenerator, generate_results_chapter
 
 # Page configuration
 st.set_page_config(
@@ -123,6 +124,9 @@ def init_session_state():
         },
         "quality_distribution": {"HIGH": 0, "MODERATE": 0, "LOW": 0, "CRITICAL": 0},
         "results_df": None,
+        "narrative_generator": None,
+        "generated_narratives": None,
+        "narrative_generating": False,
     }
 
     for key, default in defaults.items():
@@ -610,6 +614,173 @@ QUALITY DISTRIBUTION
 
         with export_cols[3]:
             st.button("📧 Email Report", use_container_width=True, disabled=True)
+
+        # Narrative Generation Section
+        st.divider()
+        st.subheader("📝 Generate Results Chapter (BAB IV)")
+        st.markdown("""
+        <div style="background: #F0FDF4; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+            <p style="margin: 0; color: #065F46;">
+                <strong>Narrative Generator</strong> akan menyusun draf bab "Hasil dan Pembahasan"
+                dalam bahasa Indonesia formal untuk laporan riset Anda.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        narrative_cols = st.columns([2, 1])
+
+        with narrative_cols[0]:
+            research_title = st.text_input(
+                "Judul Penelitian",
+                placeholder="Contoh: Systematic Review tentang Penerapan AI dalam Diagnosis Medis",
+                help="Judul penelitian akan digunakan dalam konteks narasi"
+            )
+
+        with narrative_cols[1]:
+            use_llm = st.checkbox(
+                "Gunakan Claude AI",
+                value=True,
+                help="Menggunakan Claude AI untuk narasi lebih natural (memerlukan API key)"
+            )
+
+        generate_narrative_btn = st.button(
+            "🖊️ Generate Narrative Chapter",
+            type="primary",
+            use_container_width=True,
+            disabled=st.session_state.narrative_generating
+        )
+
+        if generate_narrative_btn and st.session_state.slr_state:
+            st.session_state.narrative_generating = True
+
+            with st.spinner("Generating narrative chapter..."):
+                try:
+                    # Prepare SLR results for narrative generation
+                    slr_results = {
+                        "prisma_stats": {
+                            "identified": st.session_state.prisma_stats.identified,
+                            "duplicates_removed": st.session_state.prisma_stats.duplicates_removed,
+                            "screened": st.session_state.prisma_stats.screened,
+                            "excluded_screening": st.session_state.prisma_stats.excluded_screening,
+                            "sought_retrieval": st.session_state.prisma_stats.sought_retrieval,
+                            "not_retrieved": st.session_state.prisma_stats.not_retrieved,
+                            "assessed_eligibility": st.session_state.prisma_stats.assessed_eligibility,
+                            "excluded_eligibility": st.session_state.prisma_stats.excluded_eligibility,
+                            "included_synthesis": st.session_state.prisma_stats.included_synthesis,
+                        },
+                        "exclusion_reasons": st.session_state.slr_state.get("exclusion_reasons", {}),
+                        "synthesis_ready": st.session_state.slr_state.get("synthesis_ready", []),
+                        "assessed_papers": st.session_state.slr_state.get("assessed_papers", []),
+                        "research_question": st.session_state.slr_state.get("research_question", research_title or ""),
+                    }
+
+                    # Generate narrative
+                    narratives = asyncio.run(generate_results_chapter(
+                        slr_results=slr_results,
+                        use_llm=use_llm and bool(settings.anthropic_api_key),
+                        research_title=research_title or "Systematic Literature Review"
+                    ))
+
+                    st.session_state.generated_narratives = narratives
+                    st.session_state.narrative_generator = NarrativeGenerator()
+                    st.session_state.narrative_generator.narratives = narratives
+
+                    st.success("Narrative chapter generated successfully!")
+
+                except Exception as e:
+                    st.error(f"Error generating narrative: {str(e)}")
+                finally:
+                    st.session_state.narrative_generating = False
+                    st.rerun()
+
+        # Display Generated Narratives
+        if st.session_state.generated_narratives:
+            st.divider()
+            st.subheader("📖 Generated Chapter Preview")
+
+            narratives = st.session_state.generated_narratives
+
+            # Section tabs
+            section_tabs = st.tabs([
+                "4.1 PRISMA Flow",
+                "4.2 Karakteristik",
+                "4.3 Kualitas",
+                "4.4 Sintesis Tematik",
+                "4.5 Pembahasan",
+                "4.6 Keterbatasan"
+            ])
+
+            section_keys = [
+                "prisma_flow", "study_characteristics", "quality_assessment",
+                "thematic_synthesis", "discussion", "limitations"
+            ]
+
+            for tab, key in zip(section_tabs, section_keys):
+                with tab:
+                    if key in narratives:
+                        narrative = narratives[key]
+                        st.markdown(f"### {narrative.title}")
+                        st.markdown(narrative.content)
+                        st.caption(f"Word count: {narrative.word_count}")
+
+            # Export Narrative Options
+            st.divider()
+            st.subheader("📤 Export Narrative")
+            narrative_export_cols = st.columns(3)
+
+            with narrative_export_cols[0]:
+                # Export to Markdown
+                if st.session_state.narrative_generator:
+                    md_content = st.session_state.narrative_generator.export_to_markdown()
+                    st.download_button(
+                        label="📄 Download Markdown",
+                        data=md_content,
+                        file_name="bab_iv_hasil_pembahasan.md",
+                        mime="text/markdown",
+                        use_container_width=True
+                    )
+
+            with narrative_export_cols[1]:
+                # Export to Word
+                word_btn = st.button(
+                    "📝 Generate Word Document",
+                    use_container_width=True
+                )
+
+                if word_btn and st.session_state.narrative_generator:
+                    try:
+                        import tempfile
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+                            tmp_path = tmp.name
+
+                        success = st.session_state.narrative_generator.export_to_word(tmp_path)
+
+                        if success:
+                            with open(tmp_path, "rb") as f:
+                                word_data = f.read()
+
+                            st.download_button(
+                                label="⬇️ Download Word File",
+                                data=word_data,
+                                file_name="bab_iv_hasil_pembahasan.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                use_container_width=True
+                            )
+                            os.unlink(tmp_path)
+                        else:
+                            st.warning("python-docx not installed. Install with: pip install python-docx")
+                    except Exception as e:
+                        st.error(f"Error creating Word document: {str(e)}")
+
+            with narrative_export_cols[2]:
+                # Copy to clipboard button (via text area)
+                if st.button("📋 Show Full Text", use_container_width=True):
+                    full_text = st.session_state.narrative_generator.export_to_markdown()
+                    st.text_area(
+                        "Full Narrative (copy from here)",
+                        value=full_text,
+                        height=400
+                    )
 
     # Footer
     st.divider()

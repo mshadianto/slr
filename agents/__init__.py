@@ -10,6 +10,7 @@ from .search_agent import SearchAgent
 from .screening_agent import ScreeningAgent
 from .scrounger_agent import ScroungerAgent
 from .quality_agent import QualityAgent
+from .narrative_generator import NarrativeGenerator, generate_results_chapter
 
 __all__ = [
     "SLRState",
@@ -21,4 +22,6 @@ __all__ = [
     "ScreeningAgent",
     "ScroungerAgent",
     "QualityAgent",
+    "NarrativeGenerator",
+    "generate_results_chapter",
 ]
