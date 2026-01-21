@@ -6,7 +6,7 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-green.svg)](https://github.com/langchain-ai/langgraph)
 
-BiblioAgent AI automates the systematic literature review (SLR) process using a multi-agent architecture powered by LangGraph. It implements PRISMA 2020 guidelines with intelligent paper retrieval, screening, and quality assessment.
+BiblioAgent AI automates the systematic literature review (SLR) process using a multi-agent architecture powered by LangGraph. It implements PRISMA 2020 guidelines with intelligent paper retrieval, screening, quality assessment, and **automated academic writing in formal Indonesian**.
 
 ---
 
@@ -17,6 +17,13 @@ BiblioAgent AI automates the systematic literature review (SLR) process using a 
 - **Screening Agent** - 4-phase LLM-powered title/abstract screening with confidence scoring
 - **Scrounger Agent** - Waterfall PDF retrieval with Virtual Full-Text synthesis
 - **Quality Agent** - JBI Critical Appraisal framework assessment
+- **Narrative Generator** - Auto-generate Results chapter (BAB IV) in formal Indonesian
+- **Narrative Orchestrator** - Full 5-chapter research report generation
+
+### Expert Features (NEW)
+- **Citation Auto-Stitcher** - Automatically match author names with bibliography from Scopus
+- **Logic Continuity Agent** - Ensure "benang merah" (red thread) across all chapters
+- **Forensic Audit Agent** - Verify every citation against source database
 
 ### BiblioHunter - Intelligent Paper Retrieval
 - **Multi-identifier support** - DOI, ArXiv ID, PMID, Semantic Scholar ID, Title search
@@ -37,63 +44,198 @@ BiblioAgent AI automates the systematic literature review (SLR) process using a 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    BiblioAgent AI Dashboard                      │
-│                      (Streamlit app.py)                          │
-└─────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    LangGraph Orchestrator                        │
-│                  (agents/orchestrator.py)                        │
-└─────────────────────────────────────────────────────────────────┘
-                               │
-        ┌──────────────────────┼──────────────────────┐
-        ▼                      ▼                      ▼
-┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│ Search Agent  │───▶│Screening Agent│───▶│Scrounger Agent│
-│  (Scopus API) │    │ (Claude LLM)  │    │ (BiblioHunter)│
-└───────────────┘    └───────────────┘    └───────────────┘
-                                                   │
-                                                   ▼
-                                          ┌───────────────┐
-                                          │ Quality Agent │
-                                          │  (JBI CRaT)   │
-                                          └───────────────┘
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       BiblioAgent AI Dashboard                           │
+│                         (Streamlit app.py)                               │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       LangGraph Orchestrator                             │
+│                     (agents/orchestrator.py)                             │
+└─────────────────────────────────────────────────────────────────────────┘
+                                    │
+         ┌──────────────────────────┼──────────────────────────┐
+         ▼                          ▼                          ▼
+┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
+│  Search Agent   │─────▶│ Screening Agent │─────▶│ Scrounger Agent │
+│  (Scopus API)   │      │  (Claude LLM)   │      │  (BiblioHunter) │
+└─────────────────┘      └─────────────────┘      └─────────────────┘
+                                                           │
+                                                           ▼
+                                                  ┌─────────────────┐
+                                                  │  Quality Agent  │
+                                                  │   (JBI CRaT)    │
+                                                  └─────────────────┘
+                                                           │
+                    ┌──────────────────────────────────────┼──────────────────────────────────────┐
+                    ▼                                      ▼                                      ▼
+         ┌─────────────────┐                   ┌─────────────────┐                   ┌─────────────────┐
+         │    Narrative    │                   │    Narrative    │                   │  Expert Tools   │
+         │   Generator     │                   │  Orchestrator   │                   │  (Audit/Cite)   │
+         │   (BAB IV)      │                   │  (BAB I-V)      │                   │                 │
+         └─────────────────┘                   └─────────────────┘                   └─────────────────┘
 ```
 
-### Waterfall Retrieval Flow
+---
 
+## Narrative Generation
+
+### Narrative Generator (BAB IV)
+
+Generates formal Indonesian "Hasil dan Pembahasan" chapter with 6 sub-sections:
+
+```python
+from agents import NarrativeGenerator
+
+generator = NarrativeGenerator(anthropic_client=client)
+narratives = await generator.generate_full_chapter(slr_results)
+
+# Generated sections:
+# 4.1 Proses Seleksi Studi (PRISMA Flow)
+# 4.2 Karakteristik Studi yang Diinklusi
+# 4.3 Penilaian Kualitas Studi
+# 4.4 Sintesis Tematik
+# 4.5 Diskusi
+# 4.6 Keterbatasan Studi
+
+# Export
+generator.export_to_markdown()
+generator.export_to_word("bab_iv.docx")
 ```
-Paper DOI/ID
-     │
-     ▼
-┌────────────────────┐
-│ Semantic Scholar   │──── PDF Found? ────▶ Return PDF URL
-│   Open Access      │         │
-└────────────────────┘         │ No
-                               ▼
-                    ┌────────────────────┐
-                    │     Unpaywall      │──── PDF Found? ────▶ Return PDF URL
-                    │   (Green/Gold OA)  │         │
-                    └────────────────────┘         │ No
-                                                   ▼
-                                        ┌────────────────────┐
-                                        │       CORE         │──── PDF? ────▶ Return
-                                        │   (200M+ papers)   │        │
-                                        └────────────────────┘        │ No
-                                                                      ▼
-                                                           ┌────────────────────┐
-                                                           │      ArXiv         │
-                                                           │   (Title Search)   │
-                                                           └────────────────────┘
-                                                                      │ No PDF
-                                                                      ▼
-                                                           ┌────────────────────┐
-                                                           │  Virtual Full-Text │
-                                                           │ (Citation Contexts)│
-                                                           └────────────────────┘
+
+### Narrative Orchestrator (Full Report)
+
+Generates complete 5-chapter research report:
+
+```python
+from agents import NarrativeOrchestrator
+
+orchestrator = NarrativeOrchestrator(api_key="sk-ant-...")
+chapters = orchestrator.generate_full_report(
+    research_question="Bagaimana efektivitas AI dalam diagnosis?",
+    scopus_metadata=scopus_stats,
+    extraction_table=extracted_data,
+    prisma_stats=prisma_stats
+)
+
+# Generated chapters:
+# BAB I   - Pendahuluan (Background, urgency, research gap)
+# BAB II  - Tinjauan Pustaka (Literature synthesis by themes)
+# BAB III - Metodologi (SLR, PRISMA, Waterfall Retrieval)
+# BAB IV  - Hasil dan Pembahasan (Data analysis)
+# BAB V   - Kesimpulan dan Saran (Conclusions, recommendations)
+
+# Export
+orchestrator.export_to_markdown()
+orchestrator.export_to_word("laporan_lengkap.docx")
 ```
+
+---
+
+## Expert Features
+
+### 1. Citation Auto-Stitcher
+
+Automatically matches author names in narrative with bibliography entries:
+
+```python
+from agents import CitationAutoStitcher, CitationStyle
+
+stitcher = CitationAutoStitcher(citation_style=CitationStyle.APA7)
+
+# Load bibliography from various formats
+stitcher.load_bibtex("references.bib")
+stitcher.load_ris("scopus_export.ris")
+stitcher.load_scopus_csv("scopus.csv")
+stitcher.load_from_papers(slr_papers)
+
+# Auto-stitch citations
+result = stitcher.stitch_citations(narrative_text)
+
+print(result.stitched_text)      # Text with citations inserted
+print(result.citations_added)     # Number of citations added
+print(result.bibliography)        # Formatted bibliography
+
+# Supported styles: APA7, Vancouver, Harvard, IEEE
+```
+
+**Detects patterns:**
+- `Menurut Smith (2023)` → `Menurut Smith (2023) (Smith, 2023)`
+- `Studi oleh Wang` → auto-matches to bibliography
+- `Garcia et al.` → finds multi-author entries
+
+### 2. Logic Continuity Agent
+
+Ensures logical flow ("benang merah") across all chapters:
+
+```python
+from agents import LogicContinuityAgent
+
+agent = LogicContinuityAgent(anthropic_api_key="sk-ant-...")
+report = agent.analyze_report(chapters_dict, research_question)
+
+print(f"Overall Score: {report.overall_score}/100")
+print(f"Is Coherent: {report.is_coherent}")
+
+# Detailed scores
+print(f"RQ Alignment: {report.research_question_alignment}%")
+print(f"Method-Results Match: {report.methodology_results_match}%")
+print(f"Conclusion Support: {report.conclusion_support_score}%")
+print(f"Terminology: {report.terminology_consistency}%")
+print(f"Transitions: {report.transition_quality}%")
+
+# Issues found
+for issue in report.issues:
+    print(f"[{issue.level}] {issue.chapter}: {issue.description}")
+    print(f"  Suggestion: {issue.suggestion}")
+```
+
+**Checks:**
+- Research question alignment across all chapters
+- Methodology-results consistency
+- Conclusions supported by findings
+- Terminology consistency (AI vs Kecerdasan Buatan)
+- Smooth transitions between chapters
+
+### 3. Forensic Audit Agent
+
+Verifies every citation against source database:
+
+```python
+from agents import ForensicAuditAgent
+
+auditor = ForensicAuditAgent(
+    papers_data=slr_papers,
+    anthropic_api_key="sk-ant-..."  # Optional for LLM verification
+)
+
+result = auditor.verify_narrative(chapter_text)
+
+print(f"Verification Rate: {result.verification_rate}%")
+print(f"Verified: {result.verified_count}")
+print(f"Unverified: {result.unverified_count}")
+print(f"Not Found: {result.not_found_count}")
+
+# Evidence details
+for evidence in result.evidences:
+    print(f"[{evidence.status}] {evidence.citation_id}")
+    print(f"  Claim: {evidence.original_claim}")
+    print(f"  Source: {evidence.source_title}")
+    print(f"  Similarity: {evidence.similarity_score:.0%}")
+```
+
+**Detects citation formats:**
+- DOI: `[DOI: 10.1038/xxx]`, `(DOI: ...)`, `https://doi.org/...`
+- Author-Year: `(Smith, 2023)`, `Smith et al. (2023)`
+- Numbered: `[1]`, `[2-5]`, `[1,3,5]`
+
+**Verification Statuses:**
+- ✅ VERIFIED - Claim fully supported by source
+- 🔶 PARTIAL - Some support found
+- ❌ UNVERIFIED - No support in source content
+- ❓ NOT_FOUND - Citation not in database
+- 🔍 NEEDS_REVIEW - Manual review recommended
 
 ---
 
@@ -169,6 +311,27 @@ streamlit run app.py --server.port 8502
 
 Open http://localhost:8501 in your browser.
 
+### Dashboard Sections
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│  📊 PRISMA Metrics & Flowchart                                         │
+├────────────────────────────────────────────────────────────────────────┤
+│  📑 Synthesis Table (CSV/JSON export)                                  │
+├────────────────────────────────────────────────────────────────────────┤
+│  📝 Generate Results Chapter (BAB IV)                                  │
+│     └── NarrativeGenerator - 6 sub-sections                            │
+├────────────────────────────────────────────────────────────────────────┤
+│  📚 Generate Full Research Report (5 Chapters)                         │
+│     └── NarrativeOrchestrator - BAB I-V                               │
+├────────────────────────────────────────────────────────────────────────┤
+│  🎓 Expert Features                                                    │
+│     ├── 📚 Citation Auto-Stitcher                                      │
+│     ├── 🔗 Logic Continuity Check                                      │
+│     └── 🔬 Forensic Audit                                              │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
 ### Programmatic Usage
 
 #### Full SLR Pipeline
@@ -232,41 +395,14 @@ result = hunter.hunt("2303.08774")
 result = hunter.hunt("Attention is All You Need")
 
 # Batch processing with progress
-def progress(current, total, msg):
-    print(f"[{current}/{total}] {msg}")
-
 results = hunter.batch_hunt(
     ["10.1038/s41586-020-2649-2", "2303.08774"],
     max_workers=3,
-    progress_callback=progress
+    progress_callback=lambda c, t, m: print(f"[{c}/{t}] {m}")
 )
 
 # Download PDF
 pdf_path = hunter.download_pdf(result)
-```
-
-#### Scrounger Agent Direct Usage
-
-```python
-import asyncio
-from agents.scrounger_agent import acquire_papers
-
-papers = [
-    {"doi": "10.1038/nature12373", "title": "CRISPR Paper"},
-    {"arxiv_id": "2303.08774", "title": "GPT-4 Report"},
-]
-
-async def acquire():
-    results = await acquire_papers(
-        papers,
-        s2_api_key="your_key",
-        unpaywall_email="your@email.com"
-    )
-
-    for paper in results:
-        print(f"{paper['title']}: {paper['full_text_source']}")
-
-asyncio.run(acquire())
 ```
 
 ---
@@ -275,34 +411,39 @@ asyncio.run(acquire())
 
 ```
 BiblioAgent-AI/
-├── app.py                    # Streamlit dashboard
-├── config.py                 # Pydantic settings management
-├── requirements.txt          # Python dependencies
-├── .env.example             # Environment template
-├── README.md                # This file
+├── app.py                        # Streamlit dashboard
+├── config.py                     # Pydantic settings management
+├── requirements.txt              # Python dependencies
+├── .env.example                  # Environment template
+├── README.md                     # This file
 │
-├── agents/                  # Multi-agent system
+├── agents/                       # Multi-agent system
 │   ├── __init__.py
-│   ├── state.py             # LangGraph state definitions
-│   ├── orchestrator.py      # Workflow orchestration
-│   ├── search_agent.py      # Scopus search & query generation
-│   ├── screening_agent.py   # Title/abstract screening
-│   ├── scrounger_agent.py   # Full-text acquisition (BiblioHunter)
-│   └── quality_agent.py     # JBI quality assessment
+│   ├── state.py                  # LangGraph state definitions
+│   ├── orchestrator.py           # Workflow orchestration
+│   ├── search_agent.py           # Scopus search & query generation
+│   ├── screening_agent.py        # Title/abstract screening
+│   ├── scrounger_agent.py        # Full-text acquisition (BiblioHunter)
+│   ├── quality_agent.py          # JBI quality assessment
+│   ├── narrative_generator.py    # BAB IV generation (Indonesian)
+│   ├── narrative_orchestrator.py # Full 5-chapter report
+│   ├── citation_stitcher.py      # Auto citation matching
+│   ├── logic_continuity_agent.py # Report coherence checker
+│   └── forensic_audit_agent.py   # Citation verification
 │
-├── api/                     # External API clients
+├── api/                          # External API clients
 │   ├── __init__.py
-│   ├── biblio_hunter.py     # Enhanced paper retrieval
-│   ├── scopus.py            # Scopus API client
-│   ├── unpaywall.py         # Unpaywall API client
-│   ├── core_api.py          # CORE API client
-│   ├── arxiv_api.py         # ArXiv API client
-│   └── semantic_scholar.py  # Semantic Scholar client
+│   ├── biblio_hunter.py          # Enhanced paper retrieval
+│   ├── scopus.py                 # Scopus API client
+│   ├── unpaywall.py              # Unpaywall API client
+│   ├── core_api.py               # CORE API client
+│   ├── arxiv_api.py              # ArXiv API client
+│   └── semantic_scholar.py       # Semantic Scholar client
 │
-├── rag/                     # RAG components
-│   └── chromadb_store.py    # Vector store for semantic search
+├── rag/                          # RAG components
+│   └── chromadb_store.py         # Vector store for semantic search
 │
-└── docs/                    # Documentation
+└── docs/                         # Documentation
     └── BIBLIOGRAPHY_STRATEGY.md
 ```
 
@@ -404,6 +545,11 @@ streamlit run app.py --server.port 8502
 - Checkpointing is disabled by default
 - Use `enable_checkpointing=False` in orchestrator
 
+**python-docx not installed**
+```bash
+pip install python-docx
+```
+
 ---
 
 ## Contributing
@@ -428,7 +574,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Unpaywall](https://unpaywall.org/) - Open access PDF discovery
 - [CORE](https://core.ac.uk/) - Open access aggregator
 - [ArXiv](https://arxiv.org/) - Preprint server
-- [Anthropic Claude](https://www.anthropic.com/) - LLM for screening and synthesis
+- [Anthropic Claude](https://www.anthropic.com/) - LLM for screening, synthesis, and narrative generation
 - [LangGraph](https://github.com/langchain-ai/langgraph) - Multi-agent orchestration
 
 ---
