@@ -12,6 +12,8 @@ from .scrounger_agent import ScroungerAgent
 from .quality_agent import QualityAgent
 from .narrative_generator import NarrativeGenerator, generate_results_chapter
 from .narrative_orchestrator import NarrativeOrchestrator, generate_full_research_report
+from .citation_stitcher import CitationAutoStitcher, auto_stitch_citations, CitationStyle
+from .logic_continuity_agent import LogicContinuityAgent, check_report_continuity
 
 __all__ = [
     "SLRState",
@@ -27,4 +29,9 @@ __all__ = [
     "generate_results_chapter",
     "NarrativeOrchestrator",
     "generate_full_research_report",
+    "CitationAutoStitcher",
+    "auto_stitch_citations",
+    "CitationStyle",
+    "LogicContinuityAgent",
+    "check_report_continuity",
 ]

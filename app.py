@@ -31,6 +31,8 @@ from agents.state import SLRState, PRISMAStats, AgentStatus, create_initial_stat
 from agents.orchestrator import SLROrchestrator
 from agents.narrative_generator import NarrativeGenerator, generate_results_chapter
 from agents.narrative_orchestrator import NarrativeOrchestrator
+from agents.citation_stitcher import CitationAutoStitcher, CitationStyle
+from agents.logic_continuity_agent import LogicContinuityAgent
 
 # Page configuration
 st.set_page_config(
@@ -131,6 +133,9 @@ def init_session_state():
         "report_orchestrator": None,
         "full_report_chapters": None,
         "report_generating": False,
+        "citation_stitcher": None,
+        "continuity_report": None,
+        "bibliography_loaded": False,
     }
 
     for key, default in defaults.items():
@@ -995,6 +1000,238 @@ QUALITY DISTRIBUTION
                         height=500,
                         key="full_report_text"
                     )
+
+        # Expert Features Section
+        st.divider()
+        st.subheader("🎓 Expert Features")
+
+        expert_tabs = st.tabs(["📚 Citation Auto-Stitcher", "🔗 Logic Continuity Check"])
+
+        # Tab 1: Citation Auto-Stitcher
+        with expert_tabs[0]:
+            st.markdown("""
+            <div style="background: #FEF3C7; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <p style="margin: 0; color: #92400E;">
+                    <strong>Citation Auto-Stitcher</strong> secara otomatis mencocokkan nama penulis
+                    dalam narasi dengan daftar pustaka dari Scopus. Menghilangkan proses manual yang membosankan!
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            citation_cols = st.columns([2, 1])
+
+            with citation_cols[0]:
+                bib_file = st.file_uploader(
+                    "Upload Bibliography File",
+                    type=["bib", "ris", "csv", "json"],
+                    help="Upload file dari Scopus export (.bib, .ris, .csv) atau JSON",
+                    key="bib_upload"
+                )
+
+            with citation_cols[1]:
+                citation_style = st.selectbox(
+                    "Citation Style",
+                    options=["APA 7th Edition", "Vancouver", "Harvard", "IEEE"],
+                    index=0,
+                    key="citation_style_select"
+                )
+
+            style_map = {
+                "APA 7th Edition": CitationStyle.APA7,
+                "Vancouver": CitationStyle.VANCOUVER,
+                "Harvard": CitationStyle.HARVARD,
+                "IEEE": CitationStyle.IEEE
+            }
+
+            if bib_file:
+                # Save uploaded file temporarily
+                import tempfile
+                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{bib_file.name.split('.')[-1]}") as tmp:
+                    tmp.write(bib_file.getvalue())
+                    tmp_path = tmp.name
+
+                # Initialize stitcher
+                stitcher = CitationAutoStitcher(citation_style=style_map[citation_style])
+
+                # Load based on file type
+                ext = bib_file.name.split('.')[-1].lower()
+                if ext == 'bib':
+                    count = stitcher.load_bibtex(tmp_path)
+                elif ext == 'ris':
+                    count = stitcher.load_ris(tmp_path)
+                elif ext == 'csv':
+                    count = stitcher.load_scopus_csv(tmp_path)
+                elif ext == 'json':
+                    count = stitcher.load_json(tmp_path)
+                else:
+                    count = 0
+
+                os.unlink(tmp_path)
+
+                if count > 0:
+                    st.success(f"Loaded {count} bibliography entries")
+                    st.session_state.citation_stitcher = stitcher
+                    st.session_state.bibliography_loaded = True
+
+            # Also load from SLR papers if available
+            if st.session_state.slr_state and not st.session_state.bibliography_loaded:
+                papers = st.session_state.slr_state.get("synthesis_ready", [])
+                if papers:
+                    stitcher = CitationAutoStitcher(citation_style=style_map[citation_style])
+                    count = stitcher.load_from_papers(papers)
+                    if count > 0:
+                        st.info(f"Auto-loaded {count} entries from SLR results")
+                        st.session_state.citation_stitcher = stitcher
+
+            if st.session_state.citation_stitcher and st.session_state.full_report_chapters:
+                if st.button("🔄 Auto-Stitch Citations", type="primary", use_container_width=True, key="stitch_btn"):
+                    with st.spinner("Stitching citations..."):
+                        stitcher = st.session_state.citation_stitcher
+                        stitched_chapters = {}
+
+                        for chapter_type, chapter in st.session_state.full_report_chapters.items():
+                            result = stitcher.stitch_citations(chapter.content)
+                            chapter.content = result.stitched_text
+                            stitched_chapters[chapter_type] = result
+
+                        total_citations = sum(r.citations_added for r in stitched_chapters.values())
+                        st.success(f"Added {total_citations} citations across all chapters!")
+
+                        # Show warnings if any
+                        all_warnings = []
+                        for result in stitched_chapters.values():
+                            all_warnings.extend(result.warnings)
+
+                        if all_warnings:
+                            with st.expander(f"Warnings ({len(all_warnings)})"):
+                                for w in all_warnings[:10]:
+                                    st.warning(w)
+
+                        # Generate bibliography
+                        bibliography = stitcher.format_bibliography()
+                        st.markdown("### Generated Bibliography")
+                        st.markdown(bibliography)
+
+        # Tab 2: Logic Continuity Check
+        with expert_tabs[1]:
+            st.markdown("""
+            <div style="background: #DBEAFE; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <p style="margin: 0; color: #1E40AF;">
+                    <strong>Logic Continuity Agent</strong> membaca Bab 1-5 untuk memastikan
+                    "benang merah" riset tidak terputus. Dijalankan sebelum finalisasi dokumen.
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if st.session_state.full_report_chapters:
+                continuity_cols = st.columns([3, 1])
+
+                with continuity_cols[0]:
+                    rq_input = st.text_input(
+                        "Research Question (optional)",
+                        value=st.session_state.slr_state.get("research_question", "") if st.session_state.slr_state else "",
+                        placeholder="Pertanyaan penelitian utama...",
+                        key="rq_continuity"
+                    )
+
+                with continuity_cols[1]:
+                    use_llm_check = st.checkbox(
+                        "Use Claude AI",
+                        value=True,
+                        help="Analisis mendalam dengan Claude AI",
+                        key="use_llm_continuity"
+                    )
+
+                if st.button("🔍 Check Logic Continuity", type="primary", use_container_width=True, key="check_continuity_btn"):
+                    with st.spinner("Analyzing report continuity..."):
+                        # Prepare chapters dict
+                        chapters_dict = {}
+                        for chapter_type, chapter in st.session_state.full_report_chapters.items():
+                            key = chapter_type.value if hasattr(chapter_type, 'value') else str(chapter_type)
+                            chapters_dict[key] = chapter.content
+
+                        # Run analysis
+                        api_key = settings.anthropic_api_key if use_llm_check else None
+                        agent = LogicContinuityAgent(anthropic_api_key=api_key)
+                        report = agent.analyze_report(chapters_dict, rq_input)
+
+                        st.session_state.continuity_report = report
+
+                # Display continuity report
+                if st.session_state.continuity_report:
+                    report = st.session_state.continuity_report
+
+                    # Overall score with color
+                    score_color = "#10B981" if report.overall_score >= 70 else "#F59E0B" if report.overall_score >= 50 else "#EF4444"
+
+                    st.markdown(f"""
+                    <div style="text-align: center; padding: 1.5rem; background: linear-gradient(135deg, {score_color}22, {score_color}11); border-radius: 12px; margin: 1rem 0;">
+                        <h1 style="color: {score_color}; margin: 0; font-size: 3rem;">{report.overall_score:.0f}</h1>
+                        <p style="color: #6B7280; margin: 0.5rem 0 0 0;">Skor Kontinuitas Logis</p>
+                        <p style="color: {score_color}; font-weight: bold;">{'✅ COHERENT' if report.is_coherent else '⚠️ NEEDS REVISION'}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Score breakdown
+                    score_cols = st.columns(5)
+                    scores = [
+                        ("RQ Alignment", report.research_question_alignment),
+                        ("Method-Result", report.methodology_results_match),
+                        ("Conclusion", report.conclusion_support_score),
+                        ("Terminology", report.terminology_consistency),
+                        ("Transitions", report.transition_quality),
+                    ]
+
+                    for col, (label, score) in zip(score_cols, scores):
+                        with col:
+                            st.metric(label, f"{score:.0f}%")
+
+                    # Issues
+                    if report.issues:
+                        st.markdown("### Issues Found")
+
+                        critical = [i for i in report.issues if i.level.value == "critical"]
+                        warnings = [i for i in report.issues if i.level.value == "warning"]
+                        suggestions = [i for i in report.issues if i.level.value == "suggestion"]
+
+                        if critical:
+                            st.error(f"**{len(critical)} Critical Issues**")
+                            for issue in critical:
+                                st.markdown(f"- **{issue.chapter}**: {issue.description}")
+                                st.caption(f"  💡 {issue.suggestion}")
+
+                        if warnings:
+                            st.warning(f"**{len(warnings)} Warnings**")
+                            for issue in warnings:
+                                st.markdown(f"- **{issue.chapter}**: {issue.description}")
+                                st.caption(f"  💡 {issue.suggestion}")
+
+                        if suggestions:
+                            with st.expander(f"📝 {len(suggestions)} Suggestions"):
+                                for issue in suggestions:
+                                    st.markdown(f"- **{issue.chapter}**: {issue.description}")
+                                    st.caption(f"  💡 {issue.suggestion}")
+
+                    # Recommendations
+                    if report.recommendations:
+                        st.markdown("### Recommendations")
+                        for rec in report.recommendations:
+                            st.markdown(rec)
+
+                    # Download report
+                    agent = LogicContinuityAgent()
+                    report_text = agent.format_report(report)
+                    st.download_button(
+                        "📥 Download Continuity Report",
+                        data=report_text,
+                        file_name="continuity_analysis_report.txt",
+                        mime="text/plain",
+                        use_container_width=True,
+                        key="download_continuity"
+                    )
+
+            else:
+                st.info("Generate full report first to run continuity check.")
 
     # Footer
     st.divider()
