@@ -1,0 +1,65 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1E3A5F', 'primaryTextColor': '#fff', 'primaryBorderColor': '#1E3A5F', 'lineColor': '#2E8B57', 'secondaryColor': '#E8F5E9', 'tertiaryColor': '#FFF3E0'}}}%%
+
+graph TD
+    subgraph INPUT["📁 INPUT LAYER"]
+        A["📄 Upload .bib File"] --> B["🔍 Parse Bibliography"]
+        B --> C["📊 Normalize Metadata"]
+    end
+    
+    subgraph SEARCH["🔎 SEARCH AGENT"]
+        C --> D["🧠 Generate Boolean Query"]
+        D --> E["🌐 Execute Scopus API"]
+        E --> F{"Results > 0?"}
+        F -->|"❌ No"| G["🔄 Refine Query"]
+        G --> D
+        F -->|"✅ Yes"| H["🗑️ Deduplicate"]
+    end
+    
+    subgraph SCREENING["🔬 SCREENING AGENT"]
+        H --> I["📑 Title Screening"]
+        I --> J["📝 Abstract Screening"]
+        J --> K{"Meets Criteria?"}
+        K -->|"✅ Yes"| L["✓ Include"]
+        K -->|"❌ No"| M["✗ Exclude"]
+        K -->|"❓ Uncertain"| N["👤 Human Queue"]
+    end
+    
+    subgraph ACQUISITION["📥 SCROUNGER AGENT - Waterfall Retrieval"]
+        L --> O{"1️⃣ Unpaywall"}
+        O -->|"✅ Found"| P["📄 Download PDF"]
+        O -->|"❌ Not Found"| Q{"2️⃣ CORE"}
+        Q -->|"✅ Found"| P
+        Q -->|"❌ Not Found"| R{"3️⃣ ArXiv"}
+        R -->|"✅ Found"| P
+        R -->|"❌ Not Found"| S["4️⃣ Virtual Full-Text"]
+        S --> T["📚 Citation Context"]
+        T --> U["🧠 Semantic Expansion"]
+    end
+    
+    subgraph QUALITY["⚖️ EVALUATOR AGENT - JBI Framework"]
+        P --> V["🔬 Extract Study Design"]
+        U --> V
+        V --> W["📊 Sample Size Analysis"]
+        W --> X["🎯 Control Group Check"]
+        X --> Y["🎲 Randomization Score"]
+        Y --> Z["📈 Quality Score"]
+        Z --> AA{"Score Category"}
+        AA -->|"🟢 High/Moderate"| AB["✓ Synthesis"]
+        AA -->|"🟡 Low"| AC["📊 Sensitivity"]
+        AA -->|"🔴 Critical"| AD["✗ Exclude"]
+    end
+    
+    subgraph OUTPUT["📊 OUTPUT LAYER"]
+        AB --> AE["📋 PRISMA Flowchart"]
+        AC --> AE
+        AD --> AE
+        AE --> AF["📑 Synthesis Table"]
+        AF --> AG["🖥️ Streamlit Dashboard"]
+    end
+    
+    style INPUT fill:#E3F2FD,stroke:#1E3A5F,stroke-width:2px
+    style SEARCH fill:#FFF3E0,stroke:#E67E22,stroke-width:2px
+    style SCREENING fill:#E8F5E9,stroke:#2E8B57,stroke-width:2px
+    style ACQUISITION fill:#FCE4EC,stroke:#C2185B,stroke-width:2px
+    style QUALITY fill:#F3E5F5,stroke:#7B1FA2,stroke-width:2px
+    style OUTPUT fill:#E0F7FA,stroke:#00838F,stroke-width:2px
