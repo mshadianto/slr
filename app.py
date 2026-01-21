@@ -33,6 +33,7 @@ from agents.narrative_generator import NarrativeGenerator, generate_results_chap
 from agents.narrative_orchestrator import NarrativeOrchestrator
 from agents.citation_stitcher import CitationAutoStitcher, CitationStyle
 from agents.logic_continuity_agent import LogicContinuityAgent
+from agents.forensic_audit_agent import ForensicAuditAgent, VerificationStatus
 
 # Page configuration
 st.set_page_config(
@@ -136,6 +137,7 @@ def init_session_state():
         "citation_stitcher": None,
         "continuity_report": None,
         "bibliography_loaded": False,
+        "forensic_audit_result": None,
     }
 
     for key, default in defaults.items():
@@ -1005,7 +1007,7 @@ QUALITY DISTRIBUTION
         st.divider()
         st.subheader("🎓 Expert Features")
 
-        expert_tabs = st.tabs(["📚 Citation Auto-Stitcher", "🔗 Logic Continuity Check"])
+        expert_tabs = st.tabs(["📚 Citation Auto-Stitcher", "🔗 Logic Continuity Check", "🔬 Forensic Audit"])
 
         # Tab 1: Citation Auto-Stitcher
         with expert_tabs[0]:
@@ -1232,6 +1234,182 @@ QUALITY DISTRIBUTION
 
             else:
                 st.info("Generate full report first to run continuity check.")
+
+        # Tab 3: Forensic Audit
+        with expert_tabs[2]:
+            st.markdown("""
+            <div style="background: #FEE2E2; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                <p style="margin: 0; color: #991B1B;">
+                    <strong>Forensic Audit Agent</strong> memverifikasi setiap sitasi dalam narasi
+                    dengan sumber asli di database. Memastikan setiap klaim didukung bukti!
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if st.session_state.full_report_chapters:
+                audit_cols = st.columns([3, 1])
+
+                with audit_cols[0]:
+                    audit_chapter = st.selectbox(
+                        "Select Chapter to Audit",
+                        options=["All Chapters"] + [
+                            f"{k.value if hasattr(k, 'value') else k}"
+                            for k in st.session_state.full_report_chapters.keys()
+                        ],
+                        key="audit_chapter_select"
+                    )
+
+                with audit_cols[1]:
+                    use_llm_audit = st.checkbox(
+                        "LLM Verification",
+                        value=True,
+                        help="Gunakan Claude AI untuk verifikasi mendalam",
+                        key="use_llm_audit"
+                    )
+
+                if st.button("🔬 Run Forensic Audit", type="primary", use_container_width=True, key="run_audit_btn"):
+                    with st.spinner("Auditing citations... This may take a moment."):
+                        # Initialize auditor with papers from SLR
+                        papers = []
+                        if st.session_state.slr_state:
+                            papers = st.session_state.slr_state.get("synthesis_ready", [])
+                            papers.extend(st.session_state.slr_state.get("assessed_papers", []))
+
+                        api_key = settings.anthropic_api_key if use_llm_audit else None
+                        auditor = ForensicAuditAgent(
+                            papers_data=papers,
+                            anthropic_api_key=api_key
+                        )
+
+                        if audit_chapter == "All Chapters":
+                            # Audit all chapters
+                            all_results = {}
+                            for chapter_type, chapter in st.session_state.full_report_chapters.items():
+                                key = chapter_type.value if hasattr(chapter_type, 'value') else str(chapter_type)
+                                result = auditor.verify_narrative(chapter.content, key)
+                                all_results[key] = result
+
+                            # Combine results
+                            total_citations = sum(r.total_citations for r in all_results.values())
+                            total_verified = sum(r.verified_count for r in all_results.values())
+                            total_partial = sum(r.partial_count for r in all_results.values())
+                            total_unverified = sum(r.unverified_count for r in all_results.values())
+                            total_not_found = sum(r.not_found_count for r in all_results.values())
+
+                            # Create combined evidences
+                            all_evidences = []
+                            for chapter_id, result in all_results.items():
+                                for ev in result.evidences:
+                                    ev.notes = f"[{chapter_id}] {ev.notes}"
+                                    all_evidences.append(ev)
+
+                            from agents.forensic_audit_agent import AuditResult
+                            combined_result = AuditResult(
+                                document_id="Full Report",
+                                total_citations=total_citations,
+                                verified_count=total_verified,
+                                partial_count=total_partial,
+                                unverified_count=total_unverified,
+                                not_found_count=total_not_found,
+                                verification_rate=(total_verified + total_partial * 0.5) / total_citations * 100 if total_citations > 0 else 0,
+                                evidences=all_evidences,
+                                summary=f"Combined audit of {len(all_results)} chapters"
+                            )
+                            st.session_state.forensic_audit_result = combined_result
+
+                        else:
+                            # Audit single chapter
+                            for chapter_type, chapter in st.session_state.full_report_chapters.items():
+                                key = chapter_type.value if hasattr(chapter_type, 'value') else str(chapter_type)
+                                if key in audit_chapter or audit_chapter in key:
+                                    result = auditor.verify_narrative(chapter.content, key)
+                                    st.session_state.forensic_audit_result = result
+                                    break
+
+                        st.success("Forensic audit complete!")
+
+                # Display audit results
+                if st.session_state.forensic_audit_result:
+                    result = st.session_state.forensic_audit_result
+
+                    # Verification rate with color
+                    rate = result.verification_rate
+                    rate_color = "#10B981" if rate >= 70 else "#F59E0B" if rate >= 40 else "#EF4444"
+
+                    st.markdown(f"""
+                    <div style="text-align: center; padding: 1.5rem; background: linear-gradient(135deg, {rate_color}22, {rate_color}11); border-radius: 12px; margin: 1rem 0;">
+                        <h1 style="color: {rate_color}; margin: 0; font-size: 3rem;">{rate:.0f}%</h1>
+                        <p style="color: #6B7280; margin: 0.5rem 0 0 0;">Tingkat Verifikasi Sitasi</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    # Statistics
+                    stat_cols = st.columns(4)
+                    stats = [
+                        ("✅ Verified", result.verified_count, "#10B981"),
+                        ("🔶 Partial", result.partial_count, "#F59E0B"),
+                        ("❌ Unverified", result.unverified_count, "#EF4444"),
+                        ("❓ Not Found", result.not_found_count, "#6B7280"),
+                    ]
+
+                    for col, (label, count, color) in zip(stat_cols, stats):
+                        with col:
+                            st.markdown(f"""
+                            <div style="text-align: center; padding: 0.5rem; background: {color}11; border-radius: 8px;">
+                                <div style="font-size: 1.5rem; font-weight: bold; color: {color};">{count}</div>
+                                <div style="font-size: 0.8rem; color: #6B7280;">{label}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                    # Evidence details
+                    if result.evidences:
+                        st.markdown("### Citation Evidence Details")
+
+                        # Filter options
+                        filter_status = st.multiselect(
+                            "Filter by Status",
+                            options=["verified", "partial", "unverified", "not_found", "needs_review"],
+                            default=["unverified", "not_found"],
+                            key="audit_filter"
+                        )
+
+                        filtered = [e for e in result.evidences if e.status.value in filter_status]
+
+                        for i, evidence in enumerate(filtered[:20], 1):  # Show max 20
+                            status_color = {
+                                VerificationStatus.VERIFIED: "#10B981",
+                                VerificationStatus.PARTIALLY_VERIFIED: "#F59E0B",
+                                VerificationStatus.UNVERIFIED: "#EF4444",
+                                VerificationStatus.SOURCE_NOT_FOUND: "#6B7280",
+                                VerificationStatus.NEEDS_REVIEW: "#8B5CF6"
+                            }
+
+                            with st.expander(f"{i}. [{evidence.status.value.upper()}] {evidence.citation_id[:40]}..."):
+                                st.markdown(f"**Klaim:** {evidence.original_claim}")
+                                st.markdown(f"**Similarity:** {evidence.similarity_score:.0%}")
+
+                                if evidence.source_title:
+                                    st.markdown(f"**Sumber:** {evidence.source_title}")
+
+                                if evidence.source_snippet:
+                                    st.markdown(f"**Snippet:** {evidence.source_snippet[:200]}...")
+
+                                st.caption(f"Notes: {evidence.notes}")
+
+                    # Download audit report
+                    auditor = ForensicAuditAgent()
+                    report_text = auditor.format_audit_report(result)
+                    st.download_button(
+                        "📥 Download Audit Report",
+                        data=report_text,
+                        file_name="forensic_audit_report.txt",
+                        mime="text/plain",
+                        use_container_width=True,
+                        key="download_audit"
+                    )
+
+            else:
+                st.info("Generate full report first to run forensic audit.")
 
     # Footer
     st.divider()

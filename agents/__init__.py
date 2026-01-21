@@ -14,6 +14,7 @@ from .narrative_generator import NarrativeGenerator, generate_results_chapter
 from .narrative_orchestrator import NarrativeOrchestrator, generate_full_research_report
 from .citation_stitcher import CitationAutoStitcher, auto_stitch_citations, CitationStyle
 from .logic_continuity_agent import LogicContinuityAgent, check_report_continuity
+from .forensic_audit_agent import ForensicAuditAgent, audit_narrative
 
 __all__ = [
     "SLRState",
@@ -34,4 +35,6 @@ __all__ = [
     "CitationStyle",
     "LogicContinuityAgent",
     "check_report_continuity",
+    "ForensicAuditAgent",
+    "audit_narrative",
 ]
