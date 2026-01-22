@@ -2,6 +2,7 @@
 
 **Faithful Research Companion — Intelligent SLR Automation System**
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Railway-blueviolet.svg)](https://muezza-ai.up.railway.app/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-green.svg)](https://github.com/langchain-ai/langgraph)
@@ -169,6 +170,33 @@ streamlit run app.py --server.port 8502
 ```
 
 Open http://localhost:8502 in your browser.
+
+---
+
+## Railway Deployment
+
+**Live Demo:** [https://muezza-ai.up.railway.app/](https://muezza-ai.up.railway.app/)
+
+### Deploy Your Own Instance
+
+1. Fork this repository
+2. Create a new project on [Railway](https://railway.app/)
+3. Connect your GitHub repo
+4. Add environment variables in Railway dashboard:
+   - `ANTHROPIC_API_KEY` (required)
+   - `SCOPUS_API_KEY` (required)
+   - `SEMANTIC_SCHOLAR_API_KEY` (optional)
+   - `UNPAYWALL_EMAIL` (optional)
+5. Railway auto-detects `Procfile` and deploys
+
+### Deployment Files
+
+| File | Purpose |
+|------|---------|
+| `Procfile` | Start command for Railway |
+| `railway.toml` | Nixpacks builder config |
+| `packages.txt` | System dependencies |
+| `.streamlit/config.toml` | Streamlit settings |
 
 ---
 
