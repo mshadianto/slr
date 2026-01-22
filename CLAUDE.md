@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Muezza AI (formerly BiblioAgent AI) is a Streamlit-based systematic literature review (SLR) automation system for PRISMA 2020 compliance. It uses a multi-agent architecture (LangGraph) with RAG to automate search, screening, full-text acquisition, quality assessment, and **automated academic writing in formal Indonesian**.
+Muezza AI is a Streamlit-based systematic literature review (SLR) automation system for PRISMA 2020 compliance. It uses a multi-agent architecture (LangGraph) with RAG to automate search, screening, full-text acquisition, quality assessment, and **automated academic writing in formal Indonesian**.
 
 **Key Innovation**: BiblioHunter - intelligent paper retrieval with waterfall PDF acquisition and Virtual Full-Text synthesis for paywalled papers.
 
@@ -30,11 +30,15 @@ CORE_API_KEY=your_core_key            # Optional
 
 ### Multi-Agent Pipeline (LangGraph)
 
+The workflow is a linear state machine defined in `agents/orchestrator.py`:
+
 ```
 search_node → screening_node → acquisition_node → quality_node → END
                                                         ↓
                     narrative_generator → narrative_orchestrator → docx_export
 ```
+
+**State Management**: All agents share `SLRState` (TypedDict in `agents/state.py`) which tracks papers through each phase, PRISMA statistics, and agent status.
 
 **Core SLR Agents** (`agents/`):
 - `SearchAgent` - PICO parsing, Boolean query generation, Scopus search, RapidFuzz deduplication
@@ -49,10 +53,6 @@ search_node → screening_node → acquisition_node → quality_node → END
 - `LogicContinuityAgent` - Ensure "benang merah" coherence across chapters
 - `ForensicAuditAgent` - Verify every citation against source database
 - `DocxGenerator` - Professional Word export with title page
-
-**State Management**:
-- `SLRState` - LangGraph TypedDict in `agents/state.py`
-- `SLROrchestrator` - Workflow runner in `agents/orchestrator.py`
 
 ### BiblioHunter (`api/biblio_hunter.py`)
 
@@ -73,15 +73,18 @@ result = hunter.hunt("10.1038/nature12373")
 
 **Virtual Full-Text** (when no PDF available): Synthesizes content from TL;DR, abstract, citation contexts (up to 15 snippets), related papers, and key references.
 
-### API Rate Limits
+### External API Clients (`api/`)
 
-| Service | Limit |
-|---------|-------|
-| Scopus | 5000 req/week, 9/sec |
-| Semantic Scholar | 100 req/5min (no key) / 1 req/sec (with key) |
-| Unpaywall | 100K req/day |
-| CORE | 10 req/sec |
-| ArXiv | 1 req/3sec |
+Each client handles its own rate limiting and error recovery:
+- `scopus.py` - Elsevier Scopus Search API (5000 req/week, 9/sec)
+- `semantic_scholar.py` - Paper metadata and citations (100 req/5min without key)
+- `unpaywall.py` - Open access PDF discovery (100K req/day)
+- `core_api.py` - CORE aggregator (10 req/sec)
+- `arxiv_api.py` - Preprint server (1 req/3sec)
+
+### RAG Component (`rag/chromadb_store.py`)
+
+ChromaDB vector store using `all-MiniLM-L6-v2` embeddings for semantic search during screening and deduplication.
 
 ## Testing Individual Components
 
@@ -105,6 +108,19 @@ orch = NarrativeOrchestrator(api_key='sk-ant-...')
 # orch.generate_full_report(research_question='...', ...)
 "
 ```
+
+## Key Patterns
+
+**Async-first design**: All agents use async/await. Use `asyncio.run()` when testing from CLI.
+
+**Progress callbacks**: Long operations accept `progress_callback` for UI updates:
+```python
+async def acquire_papers(papers, progress_callback=None):
+    if progress_callback:
+        progress_callback(f"Processing {len(papers)} papers...")
+```
+
+**Pydantic settings**: Configuration in `config.py` uses `BaseSettings` with automatic `.env` loading.
 
 ## Troubleshooting
 
