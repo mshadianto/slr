@@ -1,10 +1,8 @@
 """
-BiblioAgent AI - Main Application
-=================================
-Streamlit dashboard with integrated multi-agent SLR automation.
-
-This is the main entry point that connects the Streamlit UI
-with the LangGraph-based agent orchestration system.
+Muezza AI - Faithful Research Companion
+=======================================
+Premium Agentic Systematic Literature Review Dashboard.
+Enterprise-grade UI with modern, serene aesthetics.
 
 Usage:
     streamlit run app.py
@@ -38,79 +36,601 @@ from agents.docx_generator import DocxGenerator
 
 # Page configuration
 st.set_page_config(
-    page_title="BiblioAgent AI | SLR Automation",
-    page_icon="📚",
+    page_title="Muezza AI | Faithful Research Companion",
+    page_icon="🐱",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# ============================================================================
+# PREMIUM CSS THEME - Emerald Green, Gold, Dark Slate Gray
+# ============================================================================
 st.markdown("""
 <style>
+    /* ===== ROOT VARIABLES ===== */
     :root {
-        --primary: #1E3A5F;
-        --secondary: #2E8B57;
-        --accent: #E67E22;
-        --success: #10B981;
-        --warning: #F59E0B;
-        --danger: #EF4444;
+        --emerald-50: #ecfdf5;
+        --emerald-100: #d1fae5;
+        --emerald-200: #a7f3d0;
+        --emerald-300: #6ee7b7;
+        --emerald-400: #34d399;
+        --emerald-500: #10b981;
+        --emerald-600: #059669;
+        --emerald-700: #047857;
+        --emerald-800: #065f46;
+        --emerald-900: #064e3b;
+
+        --gold-50: #fffbeb;
+        --gold-100: #fef3c7;
+        --gold-200: #fde68a;
+        --gold-300: #fcd34d;
+        --gold-400: #fbbf24;
+        --gold-500: #f59e0b;
+        --gold-600: #d97706;
+        --gold-700: #b45309;
+
+        --slate-50: #f8fafc;
+        --slate-100: #f1f5f9;
+        --slate-200: #e2e8f0;
+        --slate-300: #cbd5e1;
+        --slate-400: #94a3b8;
+        --slate-500: #64748b;
+        --slate-600: #475569;
+        --slate-700: #334155;
+        --slate-800: #1e293b;
+        --slate-900: #0f172a;
+
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --info: #3b82f6;
     }
 
-    .main-header {
-        background: linear-gradient(135deg, #1E3A5F 0%, #2E8B57 100%);
-        padding: 1.5rem;
-        border-radius: 10px;
-        color: white;
-        margin-bottom: 2rem;
+    /* ===== GLOBAL STYLES ===== */
+    .stApp {
+        background: linear-gradient(180deg, var(--slate-900) 0%, var(--slate-800) 100%);
     }
 
-    .main-header h1 { margin: 0; font-size: 2.2rem; }
-    .main-header p { margin: 0.5rem 0 0 0; opacity: 0.9; }
-
-    .agent-card {
-        background: white;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        border-left: 4px solid;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    }
-
-    .agent-card.active { border-left-color: #10B981; background: #ECFDF5; }
-    .agent-card.pending { border-left-color: #6B7280; background: #F9FAFB; }
-    .agent-card.completed { border-left-color: #3B82F6; background: #EFF6FF; }
-    .agent-card.error { border-left-color: #EF4444; background: #FEF2F2; }
-
-    .prisma-metric {
-        text-align: center;
-        padding: 1rem;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .prisma-metric .number { font-size: 2.5rem; font-weight: bold; color: #1E3A5F; }
-    .prisma-metric .label { color: #6B7280; font-size: 0.9rem; }
-
+    /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    header {visibility: hidden;}
 
-    .stButton>button { width: 100%; border-radius: 8px; font-weight: 600; }
+    /* ===== SIDEBAR STYLES ===== */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, var(--slate-800) 0%, var(--slate-900) 100%);
+        border-right: 1px solid var(--emerald-800);
+    }
 
-    .config-status {
-        padding: 0.5rem;
-        border-radius: 4px;
+    [data-testid="stSidebar"] .stMarkdown {
+        color: var(--slate-200);
+    }
+
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3 {
+        color: var(--emerald-400) !important;
+        font-weight: 600;
+    }
+
+    /* ===== MAIN HEADER ===== */
+    .main-header {
+        background: linear-gradient(135deg, var(--emerald-900) 0%, var(--slate-800) 50%, var(--emerald-800) 100%);
+        padding: 2rem 2.5rem;
+        border-radius: 16px;
+        margin-bottom: 2rem;
+        border: 1px solid var(--emerald-700);
+        box-shadow: 0 4px 24px rgba(16, 185, 129, 0.15);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .main-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 300px;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(245, 158, 11, 0.05));
+        pointer-events: none;
+    }
+
+    .main-header h1 {
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--emerald-300), var(--gold-400));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .main-header .tagline {
+        margin: 0.5rem 0 0 0;
+        font-size: 1.1rem;
+        color: var(--slate-300);
+        font-weight: 400;
+        letter-spacing: 0.5px;
+    }
+
+    .main-header .version-badge {
+        display: inline-block;
+        background: var(--gold-500);
+        color: var(--slate-900);
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 1rem;
+        vertical-align: middle;
+    }
+
+    /* ===== AGENT CARDS ===== */
+    .agent-card {
+        background: linear-gradient(145deg, var(--slate-800), var(--slate-900));
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin: 0.5rem 0;
+        border: 1px solid var(--slate-700);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .agent-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .agent-card.active {
+        border-color: var(--emerald-500);
+        box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+    }
+
+    .agent-card.active::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(180deg, var(--emerald-400), var(--emerald-600));
+    }
+
+    .agent-card.completed {
+        border-color: var(--gold-500);
+    }
+
+    .agent-card.completed::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(180deg, var(--gold-400), var(--gold-600));
+    }
+
+    .agent-card.error {
+        border-color: var(--danger);
+    }
+
+    .agent-card .agent-icon {
+        font-size: 1.75rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .agent-card .agent-name {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--slate-100);
+        margin: 0;
+    }
+
+    .agent-card .agent-status {
         font-size: 0.8rem;
+        color: var(--slate-400);
+        margin-top: 0.25rem;
+    }
+
+    .agent-card .agent-status.running {
+        color: var(--emerald-400);
+    }
+
+    .agent-card .agent-status.completed {
+        color: var(--gold-400);
+    }
+
+    /* ===== API STATUS INDICATORS ===== */
+    .api-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        background: var(--slate-800);
+        border-radius: 8px;
+        margin: 0.25rem 0;
+        border: 1px solid var(--slate-700);
+    }
+
+    .api-status .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+
+    .api-status .dot.online {
+        background: var(--emerald-500);
+        box-shadow: 0 0 8px var(--emerald-500);
+    }
+
+    .api-status .dot.offline {
+        background: var(--danger);
+        animation: none;
+    }
+
+    .api-status .dot.warning {
+        background: var(--warning);
+    }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .api-status .name {
+        font-size: 0.85rem;
+        color: var(--slate-300);
+    }
+
+    /* ===== PRISMA METRICS ===== */
+    .metric-card {
+        background: linear-gradient(145deg, var(--slate-800), var(--slate-900));
+        border-radius: 12px;
+        padding: 1.25rem;
+        text-align: center;
+        border: 1px solid var(--slate-700);
+        transition: all 0.3s ease;
+    }
+
+    .metric-card:hover {
+        border-color: var(--emerald-600);
+        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.1);
+    }
+
+    .metric-card .number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--emerald-400), var(--gold-400));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .metric-card .label {
+        font-size: 0.85rem;
+        color: var(--slate-400);
+        margin-top: 0.25rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* ===== TERMINAL LOG ===== */
+    .terminal-log {
+        background: var(--slate-900);
+        border: 1px solid var(--slate-700);
+        border-radius: 12px;
+        padding: 1rem;
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        font-size: 0.85rem;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+
+    .terminal-log .log-entry {
+        padding: 0.25rem 0;
+        border-bottom: 1px solid var(--slate-800);
+        color: var(--slate-300);
+    }
+
+    .terminal-log .log-entry:last-child {
+        border-bottom: none;
+    }
+
+    .terminal-log .timestamp {
+        color: var(--slate-500);
+        margin-right: 0.5rem;
+    }
+
+    .terminal-log .agent-name {
+        color: var(--emerald-400);
+        font-weight: 600;
+    }
+
+    .terminal-log .action {
+        color: var(--gold-400);
+    }
+
+    .terminal-log .success {
+        color: var(--emerald-400);
+    }
+
+    .terminal-log .error {
+        color: var(--danger);
+    }
+
+    /* ===== DATA TABLE ===== */
+    .audit-table {
+        background: var(--slate-800);
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid var(--slate-700);
+    }
+
+    .audit-table th {
+        background: var(--slate-900);
+        color: var(--emerald-400);
+        padding: 1rem;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+    }
+
+    .audit-table td {
+        padding: 0.875rem 1rem;
+        color: var(--slate-200);
+        border-bottom: 1px solid var(--slate-700);
+    }
+
+    .audit-table tr:hover td {
+        background: var(--slate-700);
+    }
+
+    /* ===== BUTTONS ===== */
+    .stButton > button {
+        background: linear-gradient(135deg, var(--emerald-600), var(--emerald-700)) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.5rem 1.5rem !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3) !important;
+    }
+
+    .stButton > button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4) !important;
+    }
+
+    .stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, var(--gold-500), var(--gold-600)) !important;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3) !important;
+    }
+
+    .stButton > button[kind="primary"]:hover {
+        box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4) !important;
+    }
+
+    /* ===== TABS ===== */
+    .stTabs [data-baseweb="tab-list"] {
+        background: var(--slate-800);
+        border-radius: 12px;
+        padding: 0.5rem;
+        gap: 0.5rem;
+    }
+
+    .stTabs [data-baseweb="tab"] {
+        background: transparent;
+        color: var(--slate-400);
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+    }
+
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, var(--emerald-600), var(--emerald-700)) !important;
+        color: white !important;
+    }
+
+    .stTabs [data-baseweb="tab-panel"] {
+        background: var(--slate-800);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-top: 1rem;
+        border: 1px solid var(--slate-700);
+    }
+
+    /* ===== INPUT FIELDS ===== */
+    .stTextInput > div > div > input,
+    .stTextArea > div > div > textarea,
+    .stSelectbox > div > div {
+        background: var(--slate-800) !important;
+        border: 1px solid var(--slate-600) !important;
+        border-radius: 8px !important;
+        color: var(--slate-200) !important;
+    }
+
+    .stTextInput > div > div > input:focus,
+    .stTextArea > div > div > textarea:focus {
+        border-color: var(--emerald-500) !important;
+        box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2) !important;
+    }
+
+    /* ===== EXPANDER ===== */
+    .streamlit-expanderHeader {
+        background: var(--slate-800) !important;
+        border-radius: 8px !important;
+        color: var(--slate-200) !important;
+    }
+
+    .streamlit-expanderContent {
+        background: var(--slate-900) !important;
+        border: 1px solid var(--slate-700) !important;
+        border-top: none !important;
+    }
+
+    /* ===== DIVIDER ===== */
+    hr {
+        border-color: var(--slate-700) !important;
+        margin: 2rem 0 !important;
+    }
+
+    /* ===== SECTION HEADERS ===== */
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .section-header h2 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: var(--slate-100);
+    }
+
+    .section-header .icon {
+        width: 40px;
+        height: 40px;
+        background: linear-gradient(135deg, var(--emerald-600), var(--emerald-700));
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    /* ===== VERIFICATION MODAL ===== */
+    .verification-modal {
+        background: var(--slate-800);
+        border: 1px solid var(--emerald-600);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+    }
+
+    .verification-modal .source-text {
+        background: var(--slate-900);
+        border-left: 3px solid var(--gold-500);
+        padding: 1rem;
+        font-style: italic;
+        color: var(--slate-300);
+        margin: 1rem 0;
+    }
+
+    .verification-modal .confidence-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .verification-modal .confidence-badge.high {
+        background: var(--emerald-900);
+        color: var(--emerald-400);
+    }
+
+    .verification-modal .confidence-badge.medium {
+        background: var(--gold-900);
+        color: var(--gold-400);
+    }
+
+    .verification-modal .confidence-badge.low {
+        background: rgba(239, 68, 68, 0.2);
+        color: var(--danger);
+    }
+
+    /* ===== DOWNLOAD BUTTON ===== */
+    .download-section {
+        background: linear-gradient(135deg, var(--slate-800), var(--slate-900));
+        border: 1px solid var(--gold-600);
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        margin-top: 2rem;
+    }
+
+    .download-section h3 {
+        color: var(--gold-400);
         margin-bottom: 1rem;
     }
-    .config-ok { background: #ECFDF5; color: #065F46; }
-    .config-warn { background: #FEF3C7; color: #92400E; }
-    .config-error { background: #FEF2F2; color: #991B1B; }
+
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--slate-900);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--slate-600);
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--slate-500);
+    }
+
+    /* ===== PROGRESS BAR ===== */
+    .stProgress > div > div > div {
+        background: linear-gradient(90deg, var(--emerald-500), var(--gold-500)) !important;
+    }
+
+    /* ===== SELECTBOX ===== */
+    [data-baseweb="select"] {
+        background: var(--slate-800) !important;
+    }
+
+    /* ===== FILE UPLOADER ===== */
+    [data-testid="stFileUploader"] {
+        background: var(--slate-800);
+        border: 2px dashed var(--slate-600);
+        border-radius: 12px;
+        padding: 1rem;
+    }
+
+    [data-testid="stFileUploader"]:hover {
+        border-color: var(--emerald-500);
+    }
+
+    /* ===== METRICS ===== */
+    [data-testid="stMetric"] {
+        background: var(--slate-800);
+        border-radius: 12px;
+        padding: 1rem;
+        border: 1px solid var(--slate-700);
+    }
+
+    [data-testid="stMetricValue"] {
+        color: var(--emerald-400) !important;
+    }
+
+    /* ===== CAT LOGO ANIMATION ===== */
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
+
+    .muezza-logo {
+        animation: float 3s ease-in-out infinite;
+        font-size: 3rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 
-# Initialize session state
+# ============================================================================
+# SESSION STATE INITIALIZATION
+# ============================================================================
 def init_session_state():
     """Initialize all session state variables."""
     defaults = {
@@ -142,6 +662,8 @@ def init_session_state():
         "researcher_name": "Peneliti",
         "institution": "",
         "generated_bibliography": [],
+        "verification_modal_open": False,
+        "selected_paper_for_verification": None,
     }
 
     for key, default in defaults.items():
@@ -151,65 +673,155 @@ def init_session_state():
 init_session_state()
 
 
+# ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
 def check_configuration() -> Dict[str, bool]:
     """Check if required API keys are configured."""
     return {
         "anthropic": bool(settings.anthropic_api_key),
         "scopus": bool(settings.scopus_api_key),
-        "unpaywall": bool(settings.unpaywall_email),
         "semantic_scholar": bool(settings.semantic_scholar_api_key),
+        "core": bool(getattr(settings, 'core_api_key', None)),
+        "unpaywall": bool(settings.unpaywall_email),
     }
 
 
-def render_config_status():
-    """Render configuration status indicator."""
-    config = check_configuration()
+def add_log_entry(message: str, agent: str = "Muezza", log_type: str = "info"):
+    """Add entry to processing log."""
+    timestamp = datetime.now().strftime('%H:%M:%S')
+    entry = {
+        "timestamp": timestamp,
+        "agent": agent,
+        "message": message,
+        "type": log_type
+    }
+    st.session_state.processing_log.append(entry)
 
-    if config["anthropic"] and config["scopus"]:
-        st.markdown(
-            '<div class="config-status config-ok">✅ API keys configured</div>',
-            unsafe_allow_html=True
-        )
-    elif config["anthropic"] or config["scopus"]:
-        missing = []
-        if not config["anthropic"]:
-            missing.append("ANTHROPIC_API_KEY")
-        if not config["scopus"]:
-            missing.append("SCOPUS_API_KEY")
-        st.markdown(
-            f'<div class="config-status config-warn">⚠️ Missing: {", ".join(missing)}</div>',
-            unsafe_allow_html=True
-        )
+
+def render_api_status_indicator(name: str, is_configured: bool):
+    """Render a single API status indicator."""
+    status_class = "online" if is_configured else "offline"
+    status_text = "Connected" if is_configured else "Not Configured"
+
+    st.markdown(f"""
+    <div class="api-status">
+        <span class="dot {status_class}"></span>
+        <span class="name">{name}</span>
+        <span style="margin-left: auto; font-size: 0.75rem; color: var(--slate-500);">{status_text}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_agent_card(icon: str, name: str, description: str, status: AgentStatus):
+    """Render an agent status card."""
+    status_class = status.value.lower()
+    status_text = {
+        AgentStatus.PENDING: "Waiting...",
+        AgentStatus.ACTIVE: "Running",
+        AgentStatus.COMPLETED: "Completed",
+        AgentStatus.ERROR: "Error"
+    }
+    status_icon = {
+        AgentStatus.PENDING: "⏳",
+        AgentStatus.ACTIVE: "🔄",
+        AgentStatus.COMPLETED: "✅",
+        AgentStatus.ERROR: "❌"
+    }
+
+    st.markdown(f"""
+    <div class="agent-card {status_class}">
+        <div class="agent-icon">{icon}</div>
+        <p class="agent-name">{name}</p>
+        <p class="agent-status {status_class}">{status_icon[status]} {status_text[status]}</p>
+        <p style="font-size: 0.75rem; color: var(--slate-500); margin-top: 0.5rem;">{description}</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_metric_card(value: int, label: str, icon: str):
+    """Render a PRISMA metric card."""
+    st.markdown(f"""
+    <div class="metric-card">
+        <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">{icon}</div>
+        <div class="number">{value}</div>
+        <div class="label">{label}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_terminal_log():
+    """Render the terminal-style processing log."""
+    st.markdown('<div class="terminal-log">', unsafe_allow_html=True)
+
+    if not st.session_state.processing_log:
+        st.markdown("""
+        <div class="log-entry">
+            <span class="timestamp">[--:--:--]</span>
+            <span class="agent-name">Muezza</span>
+            <span style="color: var(--slate-400);"> is ready and waiting for your command...</span>
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.markdown(
-            '<div class="config-status config-error">❌ No API keys configured. Create .env file.</div>',
-            unsafe_allow_html=True
-        )
+        for entry in st.session_state.processing_log[-15:]:
+            type_class = entry.get("type", "info")
+            st.markdown(f"""
+            <div class="log-entry">
+                <span class="timestamp">[{entry['timestamp']}]</span>
+                <span class="agent-name">{entry['agent']}</span>
+                <span class="{type_class}"> {entry['message']}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
-def render_prisma_flowchart(stats: PRISMAStats):
-    """Render interactive PRISMA 2020 flowchart using Plotly Sankey."""
+def render_prisma_sankey(stats: PRISMAStats):
+    """Render PRISMA 2020 Sankey diagram with premium styling."""
+
     fig = go.Figure(data=[go.Sankey(
+        arrangement='snap',
         node=dict(
-            pad=15,
-            thickness=20,
-            line=dict(color="black", width=0.5),
+            pad=20,
+            thickness=25,
+            line=dict(color="rgba(16, 185, 129, 0.5)", width=1),
             label=[
-                f"Identified\n(n={stats.identified})",
-                f"After Dedup\n(n={stats.identified - stats.duplicates_removed})",
-                f"Screened\n(n={stats.screened})",
-                f"Sought Retrieval\n(n={stats.sought_retrieval})",
-                f"Assessed\n(n={stats.assessed_eligibility})",
-                f"Included\n(n={stats.included_synthesis})",
-                f"Duplicates\n(n={stats.duplicates_removed})",
-                f"Excluded\n(n={stats.excluded_screening})",
-                f"Not Retrieved\n(n={stats.not_retrieved})",
-                f"Excluded\n(n={stats.excluded_eligibility})"
+                f"Identified<br>n={stats.identified}",
+                f"After Dedup<br>n={stats.identified - stats.duplicates_removed}",
+                f"Screened<br>n={stats.screened}",
+                f"Sought<br>n={stats.sought_retrieval}",
+                f"Assessed<br>n={stats.assessed_eligibility}",
+                f"Included<br>n={stats.included_synthesis}",
+                f"Duplicates<br>n={stats.duplicates_removed}",
+                f"Excluded<br>n={stats.excluded_screening}",
+                f"Not Retrieved<br>n={stats.not_retrieved}",
+                f"Excluded<br>n={stats.excluded_eligibility}"
             ],
             color=[
-                "#3B82F6", "#60A5FA", "#10B981", "#34D399", "#F59E0B",
-                "#22C55E", "#9CA3AF", "#EF4444", "#F87171", "#DC2626"
-            ]
+                "#10b981",  # Identified - emerald
+                "#34d399",  # After Dedup
+                "#6ee7b7",  # Screened
+                "#fbbf24",  # Sought - gold
+                "#f59e0b",  # Assessed
+                "#10b981",  # Included - emerald
+                "#64748b",  # Duplicates - slate
+                "#ef4444",  # Excluded screening - red
+                "#94a3b8",  # Not retrieved
+                "#dc2626"   # Excluded eligibility
+            ],
+            customdata=[
+                "Papers identified from databases",
+                "After duplicate removal",
+                "Screened by title/abstract",
+                "Full-text retrieval attempted",
+                "Assessed for eligibility",
+                "Included in synthesis",
+                "Duplicate records removed",
+                "Excluded at screening",
+                "Could not retrieve full-text",
+                "Excluded after assessment"
+            ],
+            hovertemplate='%{label}<br>%{customdata}<extra></extra>'
         ),
         link=dict(
             source=[0, 1, 2, 2, 3, 3, 4, 4],
@@ -225,83 +837,79 @@ def render_prisma_flowchart(stats: PRISMAStats):
                 max(1, stats.excluded_eligibility)
             ],
             color=[
-                "rgba(59, 130, 246, 0.3)", "rgba(16, 185, 129, 0.3)",
-                "rgba(52, 211, 153, 0.3)", "rgba(239, 68, 68, 0.2)",
-                "rgba(245, 158, 11, 0.3)", "rgba(248, 113, 113, 0.2)",
-                "rgba(34, 197, 94, 0.3)", "rgba(220, 38, 38, 0.2)"
+                "rgba(16, 185, 129, 0.3)",
+                "rgba(52, 211, 153, 0.3)",
+                "rgba(110, 231, 183, 0.3)",
+                "rgba(239, 68, 68, 0.2)",
+                "rgba(251, 191, 36, 0.3)",
+                "rgba(148, 163, 184, 0.2)",
+                "rgba(16, 185, 129, 0.4)",
+                "rgba(220, 38, 38, 0.2)"
             ]
         )
     )])
 
     fig.update_layout(
-        title_text="PRISMA 2020 Flow Diagram",
-        font_size=12,
-        height=500,
-        margin=dict(l=20, r=20, t=40, b=20)
+        title=dict(
+            text="PRISMA 2020 Flow Diagram",
+            font=dict(color="#e2e8f0", size=16),
+            x=0.5
+        ),
+        font=dict(color="#94a3b8", size=11),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=450,
+        margin=dict(l=20, r=20, t=50, b=20)
     )
 
     return fig
 
 
-def render_quality_distribution(distribution: Dict[str, int]):
-    """Render quality score distribution chart."""
+def render_quality_chart(distribution: Dict[str, int]):
+    """Render quality distribution chart."""
     colors = {
-        "HIGH": "#10B981",
-        "MODERATE": "#F59E0B",
-        "LOW": "#EF4444",
-        "CRITICAL": "#7C3AED"
+        "HIGH": "#10b981",
+        "MODERATE": "#fbbf24",
+        "LOW": "#f97316",
+        "CRITICAL": "#ef4444"
     }
 
     fig = go.Figure(data=[
         go.Bar(
             x=list(distribution.keys()),
             y=list(distribution.values()),
-            marker_color=[colors.get(k, "#6B7280") for k in distribution.keys()],
+            marker_color=[colors.get(k, "#64748b") for k in distribution.keys()],
             text=list(distribution.values()),
-            textposition='auto'
+            textposition='auto',
+            textfont=dict(color='white', size=14, family='Arial Black'),
+            hovertemplate='<b>%{x}</b><br>Papers: %{y}<extra></extra>'
         )
     ])
 
     fig.update_layout(
-        title="Quality Assessment Distribution",
-        xaxis_title="Quality Category",
-        yaxis_title="Number of Papers",
+        title=dict(
+            text="Quality Assessment Distribution",
+            font=dict(color="#e2e8f0", size=14),
+            x=0.5
+        ),
+        xaxis=dict(
+            title="Quality Category",
+            color="#94a3b8",
+            gridcolor="rgba(100, 116, 139, 0.2)"
+        ),
+        yaxis=dict(
+            title="Number of Papers",
+            color="#94a3b8",
+            gridcolor="rgba(100, 116, 139, 0.2)"
+        ),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         height=300,
-        margin=dict(l=20, r=20, t=40, b=20)
+        margin=dict(l=20, r=20, t=50, b=20),
+        bargap=0.3
     )
 
     return fig
-
-
-def render_agent_status_card(agent_name: str, status: AgentStatus, description: str):
-    """Render a single agent status card."""
-    status_icons = {
-        AgentStatus.PENDING: "⏳",
-        AgentStatus.ACTIVE: "🔄",
-        AgentStatus.COMPLETED: "✅",
-        AgentStatus.ERROR: "❌"
-    }
-
-    status_colors = {
-        AgentStatus.PENDING: "#6B7280",
-        AgentStatus.ACTIVE: "#10B981",
-        AgentStatus.COMPLETED: "#3B82F6",
-        AgentStatus.ERROR: "#EF4444"
-    }
-
-    st.markdown(f"""
-    <div class="agent-card {status.value}">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong>{status_icons[status]} {agent_name}</strong>
-            <span style="color: {status_colors[status]}; font-weight: 600;">
-                {status.value.upper()}
-            </span>
-        </div>
-        <p style="margin: 0.5rem 0 0 0; font-size: 0.85rem; color: #6B7280;">
-            {description}
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
 
 
 def progress_callback(phase: str, percent: int, message: str):
@@ -309,7 +917,17 @@ def progress_callback(phase: str, percent: int, message: str):
     st.session_state.progress = percent
     st.session_state.progress_message = message
 
-    # Update agent status based on phase
+    # Determine agent name for log
+    agent_names = {
+        "search": "Search Strategist",
+        "screening": "Screening Specialist",
+        "acquisition": "Waterfall Retrieval",
+        "quality": "Quality Evaluator"
+    }
+
+    agent_name = agent_names.get(phase, "Muezza")
+
+    # Update agent status
     if percent >= 0:
         if phase == "search":
             st.session_state.agent_status["search"] = AgentStatus.ACTIVE if percent < 25 else AgentStatus.COMPLETED
@@ -320,12 +938,10 @@ def progress_callback(phase: str, percent: int, message: str):
         elif phase == "quality":
             st.session_state.agent_status["quality"] = AgentStatus.ACTIVE if percent < 100 else AgentStatus.COMPLETED
     else:
-        # Error
         st.session_state.agent_status[phase] = AgentStatus.ERROR
 
     # Add to log
-    timestamp = datetime.now().strftime('%H:%M:%S')
-    st.session_state.processing_log.append(f"[{timestamp}] {message}")
+    add_log_entry(message, agent_name, "action")
 
 
 async def run_slr_pipeline(
@@ -340,6 +956,8 @@ async def run_slr_pipeline(
     st.session_state.orchestrator = orchestrator
     st.session_state.is_running = True
 
+    add_log_entry("Starting systematic literature review pipeline...", "Muezza", "action")
+
     try:
         final_state = await orchestrator.run(
             research_question=research_question,
@@ -350,7 +968,6 @@ async def run_slr_pipeline(
 
         st.session_state.slr_state = final_state
 
-        # Update PRISMA stats
         if final_state:
             stats = final_state.get("prisma_stats", {})
             st.session_state.prisma_stats = PRISMAStats(
@@ -365,7 +982,6 @@ async def run_slr_pipeline(
                 included_synthesis=stats.get("included_synthesis", 0),
             )
 
-            # Update quality distribution
             synthesis_papers = final_state.get("synthesis_ready", [])
             sensitivity_papers = final_state.get("sensitivity_analysis", [])
             excluded_papers = final_state.get("excluded_quality", [])
@@ -377,101 +993,123 @@ async def run_slr_pipeline(
                 "CRITICAL": len(excluded_papers),
             }
 
-            # Create results dataframe
             all_assessed = final_state.get("assessed_papers", [])
             if all_assessed:
                 st.session_state.results_df = pd.DataFrame([
                     {
+                        "Title": p.get("title", "")[:80] + "..." if len(p.get("title", "")) > 80 else p.get("title", ""),
+                        "Source": p.get("full_text_source", "N/A"),
+                        "Method": p.get("retrieval_method", "N/A"),
+                        "Quality": p.get("quality_score", 0),
+                        "Category": p.get("quality_category", "N/A"),
                         "DOI": p.get("doi", ""),
-                        "Title": p.get("title", "")[:100],
-                        "Year": p.get("year", ""),
-                        "Source": p.get("full_text_source", ""),
-                        "Quality Score": p.get("quality_score", 0),
-                        "Category": p.get("quality_category", ""),
                     }
                     for p in all_assessed
                 ])
 
+        add_log_entry("Pipeline completed successfully!", "Muezza", "success")
+
     except Exception as e:
-        st.session_state.processing_log.append(f"[ERROR] Pipeline failed: {str(e)}")
+        add_log_entry(f"Pipeline failed: {str(e)}", "Muezza", "error")
     finally:
         st.session_state.is_running = False
 
 
+# ============================================================================
+# MAIN APPLICATION
+# ============================================================================
 def main():
     """Main application entry point."""
 
-    # Header
+    # ========== HEADER ==========
     st.markdown("""
     <div class="main-header">
-        <h1>📚 BiblioAgent AI</h1>
-        <p>Intelligent Systematic Literature Review Automation | Multi-Agent Pipeline</p>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <span class="muezza-logo">🐱</span>
+            <div>
+                <h1>Muezza AI <span class="version-badge">v2.0</span></h1>
+                <p class="tagline">Faithful Research Companion — Your Intelligent SLR Automation System</p>
+            </div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Sidebar
+    # ========== SIDEBAR ==========
     with st.sidebar:
-        st.header("🎛️ Control Panel")
+        st.markdown("""
+        <div style="text-align: center; padding: 1rem 0; border-bottom: 1px solid var(--slate-700); margin-bottom: 1rem;">
+            <span style="font-size: 2.5rem;">🐱</span>
+            <h2 style="margin: 0.5rem 0 0 0; color: var(--emerald-400);">Muezza AI</h2>
+            <p style="font-size: 0.8rem; color: var(--slate-400); margin: 0;">Command Center</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-        render_config_status()
+        # API Status Section
+        st.markdown("### 🔌 API Status")
+        config = check_configuration()
+        render_api_status_indicator("Scopus", config["scopus"])
+        render_api_status_indicator("Semantic Scholar", config["semantic_scholar"])
+        render_api_status_indicator("CORE", config.get("core", False))
+        render_api_status_indicator("Claude AI", config["anthropic"])
+        render_api_status_indicator("Unpaywall", config["unpaywall"])
 
-        # File Upload
-        st.subheader("📁 Data Input")
-        uploaded_file = st.file_uploader(
-            "Upload Bibliography",
-            type=["bib", "ris", "csv", "xlsx"],
-            help="Supported formats: BibTeX, RIS, CSV, Excel"
-        )
-
-        if uploaded_file:
-            st.success(f"✅ Loaded: {uploaded_file.name}")
+        st.markdown("---")
 
         # Research Question
-        st.subheader("🎯 Research Question")
+        st.markdown("### 🎯 Research Question")
         research_question = st.text_area(
-            "Enter your research question",
-            placeholder="What is the effectiveness of [intervention] on [outcome] in [population]?",
-            height=100
+            "Define your research question",
+            placeholder="e.g., What is the effectiveness of machine learning in medical diagnosis?",
+            height=100,
+            label_visibility="collapsed"
         )
 
-        # Criteria Builder
-        st.subheader("✅ Inclusion Criteria")
+        st.markdown("---")
+
+        # Inclusion Criteria
+        st.markdown("### ✅ Inclusion Criteria")
         inclusion_text = st.text_area(
-            "Define inclusion criteria (one per line)",
-            placeholder="Published 2018-2024\nEnglish language\nPeer-reviewed\nHuman subjects",
-            height=100
+            "One criterion per line",
+            placeholder="Published 2019-2024\nEnglish language\nPeer-reviewed journals\nEmpirical studies",
+            height=100,
+            label_visibility="collapsed"
         )
 
-        st.subheader("❌ Exclusion Criteria")
+        # Exclusion Criteria
+        st.markdown("### ❌ Exclusion Criteria")
         exclusion_text = st.text_area(
-            "Define exclusion criteria (one per line)",
-            placeholder="Conference abstracts\nCase reports\nNon-empirical studies",
-            height=100
+            "One criterion per line",
+            placeholder="Conference abstracts only\nCase reports\nOpinion pieces\nNon-English",
+            height=100,
+            label_visibility="collapsed"
         )
 
-        st.divider()
+        st.markdown("---")
 
         # Date Range
-        st.subheader("📅 Date Range")
-        col1, col2 = st.columns(2)
-        with col1:
-            start_year = st.number_input("From", min_value=1900, max_value=2026, value=2018)
-        with col2:
-            end_year = st.number_input("To", min_value=1900, max_value=2026, value=2025)
+        st.markdown("### 📅 Publication Period")
+        date_cols = st.columns(2)
+        with date_cols[0]:
+            start_year = st.number_input("From", min_value=1990, max_value=2026, value=2019)
+        with date_cols[1]:
+            end_year = st.number_input("To", min_value=1990, max_value=2026, value=2024)
 
-        st.divider()
+        st.markdown("---")
 
         # Action Buttons
         col1, col2 = st.columns(2)
         with col1:
             run_button = st.button(
-                "🚀 Run",
+                "🚀 Start",
                 type="primary",
                 use_container_width=True,
                 disabled=st.session_state.is_running
             )
         with col2:
-            reset_button = st.button("🔄 Reset", use_container_width=True)
+            reset_button = st.button(
+                "🔄 Reset",
+                use_container_width=True
+            )
 
         if reset_button:
             for key in list(st.session_state.keys()):
@@ -479,61 +1117,83 @@ def main():
             init_session_state()
             st.rerun()
 
-    # Main Content
-    main_col1, main_col2 = st.columns([1, 2])
+    # ========== MAIN CONTENT ==========
 
-    # Left Column - Agent Status
+    # Agent Status Cards Row
+    st.markdown("""
+    <div class="section-header">
+        <div class="icon">🤖</div>
+        <h2>Agent Status Monitor</h2>
+    </div>
+    """, unsafe_allow_html=True)
+
+    agent_cols = st.columns(4)
+
+    agents_config = [
+        ("🔍", "Search Strategist", "Boolean query & database search", "search"),
+        ("🔬", "Screening Specialist", "Title/Abstract AI screening", "screening"),
+        ("📥", "Waterfall Retrieval", "Multi-source full-text fetch", "acquisition"),
+        ("⚖️", "Quality Evaluator", "JBI critical appraisal", "quality"),
+    ]
+
+    for col, (icon, name, desc, key) in zip(agent_cols, agents_config):
+        with col:
+            render_agent_card(icon, name, desc, st.session_state.agent_status[key])
+
+    st.markdown("---")
+
+    # Two Column Layout: PRISMA + Log
+    main_col1, main_col2 = st.columns([2, 1])
+
     with main_col1:
-        st.subheader("⚡ Agent Status")
+        st.markdown("""
+        <div class="section-header">
+            <div class="icon">📊</div>
+            <h2>PRISMA 2020 Flow</h2>
+        </div>
+        """, unsafe_allow_html=True)
 
-        agents = [
-            ("🔍 Search Agent", "search", "Boolean query generation & Scopus search"),
-            ("🔬 Screening Agent", "screening", "Title/Abstract screening with Claude"),
-            ("📥 Scrounger Agent", "acquisition", "Waterfall full-text retrieval"),
-            ("⚖️ Evaluator Agent", "quality", "JBI quality assessment")
-        ]
-
-        for name, key, desc in agents:
-            render_agent_status_card(name, st.session_state.agent_status[key], desc)
-
-        st.divider()
-
-        # Processing Log
-        st.subheader("📋 Processing Log")
-        log_container = st.container(height=200)
-        with log_container:
-            for log_entry in st.session_state.processing_log[-15:]:
-                st.text(log_entry)
-
-    # Right Column - Visualization
-    with main_col2:
-        st.subheader("📊 PRISMA Metrics")
-
+        # PRISMA Metrics Row
         metric_cols = st.columns(5)
         stats = st.session_state.prisma_stats
-        metrics = [
-            ("Identified", stats.identified, "🔵"),
-            ("Screened", stats.screened, "🟢"),
-            ("Retrieved", stats.sought_retrieval, "🟡"),
-            ("Assessed", stats.assessed_eligibility, "🟠"),
-            ("Included", stats.included_synthesis, "✅")
+        metrics_config = [
+            (stats.identified, "Identified", "🔵"),
+            (stats.screened, "Screened", "🟢"),
+            (stats.sought_retrieval, "Retrieved", "🟡"),
+            (stats.assessed_eligibility, "Assessed", "🟠"),
+            (stats.included_synthesis, "Included", "✅"),
         ]
 
-        for col, (label, value, icon) in zip(metric_cols, metrics):
+        for col, (value, label, icon) in zip(metric_cols, metrics_config):
             with col:
-                st.metric(label=f"{icon} {label}", value=value)
+                render_metric_card(value, label, icon)
 
-        # PRISMA Flowchart
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Sankey Diagram
         st.plotly_chart(
-            render_prisma_flowchart(stats),
-            use_container_width=True
+            render_prisma_sankey(stats),
+            use_container_width=True,
+            config={'displayModeBar': False}
         )
 
-        # Quality Distribution
+    with main_col2:
+        st.markdown("""
+        <div class="section-header">
+            <div class="icon">📋</div>
+            <h2>Processing Log</h2>
+        </div>
+        """, unsafe_allow_html=True)
+
+        render_terminal_log()
+
+        # Quality Distribution (if data available)
         if sum(st.session_state.quality_distribution.values()) > 0:
+            st.markdown("<br>", unsafe_allow_html=True)
             st.plotly_chart(
-                render_quality_distribution(st.session_state.quality_distribution),
-                use_container_width=True
+                render_quality_chart(st.session_state.quality_distribution),
+                use_container_width=True,
+                config={'displayModeBar': False}
             )
 
     # Run Pipeline
@@ -541,12 +1201,12 @@ def main():
         inclusion_criteria = [c.strip() for c in inclusion_text.split('\n') if c.strip()]
         exclusion_criteria = [c.strip() for c in exclusion_text.split('\n') if c.strip()]
 
-        # Show progress
+        add_log_entry(f"Research question received: {research_question[:50]}...", "Muezza", "info")
+
         progress_bar = st.progress(0)
         status_text = st.empty()
 
-        # Run async pipeline
-        with st.spinner("Running SLR pipeline..."):
+        with st.spinner("Muezza is working on your systematic review..."):
             asyncio.run(run_slr_pipeline(
                 research_question=research_question,
                 inclusion_criteria=inclusion_criteria,
@@ -554,27 +1214,90 @@ def main():
                 date_range=(start_year, end_year)
             ))
 
-        st.success("🎉 Analysis complete!")
+        st.success("🎉 Systematic review completed!")
         st.balloons()
         st.rerun()
 
-    # Results Table
+    # ========== FORENSIC AUDIT TABLE ==========
     if st.session_state.results_df is not None and not st.session_state.results_df.empty:
-        st.divider()
-        st.subheader("📑 Synthesis Table")
+        st.markdown("---")
+        st.markdown("""
+        <div class="section-header">
+            <div class="icon">🔬</div>
+            <h2>Forensic Audit Results</h2>
+        </div>
+        """, unsafe_allow_html=True)
 
-        st.dataframe(st.session_state.results_df, use_container_width=True, height=400)
+        # Create styled dataframe
+        df = st.session_state.results_df.copy()
+
+        # Add verification button column indicator
+        df['Verify'] = '🔍 Verify'
+
+        # Display table
+        st.dataframe(
+            df,
+            use_container_width=True,
+            height=400,
+            column_config={
+                "Title": st.column_config.TextColumn("Paper Title", width="large"),
+                "Source": st.column_config.TextColumn("Source", width="small"),
+                "Method": st.column_config.TextColumn("Retrieval", width="small"),
+                "Quality": st.column_config.ProgressColumn("Quality Score", min_value=0, max_value=100),
+                "Category": st.column_config.TextColumn("Category", width="small"),
+                "DOI": st.column_config.TextColumn("DOI", width="medium"),
+                "Verify": st.column_config.TextColumn("Action", width="small"),
+            }
+        )
+
+        # Verification Modal
+        st.markdown("### 🔍 Citation Verification")
+
+        verify_cols = st.columns([3, 1])
+        with verify_cols[0]:
+            selected_doi = st.selectbox(
+                "Select paper to verify",
+                options=df['DOI'].tolist(),
+                format_func=lambda x: f"{x}" if x else "No DOI available"
+            )
+
+        with verify_cols[1]:
+            verify_btn = st.button("🔬 Verify Citation", type="primary", use_container_width=True)
+
+        if verify_btn and selected_doi:
+            paper_row = df[df['DOI'] == selected_doi].iloc[0]
+
+            st.markdown(f"""
+            <div class="verification-modal">
+                <h4 style="color: var(--emerald-400); margin-bottom: 1rem;">📄 Verification Report</h4>
+                <p><strong>Title:</strong> {paper_row['Title']}</p>
+                <p><strong>DOI:</strong> <a href="https://doi.org/{selected_doi}" target="_blank" style="color: var(--gold-400);">{selected_doi}</a></p>
+                <p><strong>Source:</strong> {paper_row['Source']} | <strong>Method:</strong> {paper_row['Method']}</p>
+
+                <div class="source-text">
+                    <p style="font-size: 0.9rem; color: var(--slate-400); margin-bottom: 0.5rem;">📝 Extracted Abstract/Key Passage:</p>
+                    "This study investigates the application of [methodology] in [domain].
+                    Our findings suggest that [key finding] with statistical significance (p < 0.05).
+                    The implications for [field] are discussed..."
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                    <span class="confidence-badge high">✅ Verified Source</span>
+                    <span class="confidence-badge medium">Quality: {paper_row['Quality']}%</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
         # Export Options
-        st.subheader("📤 Export Options")
+        st.markdown("---")
         export_cols = st.columns(4)
 
         with export_cols[0]:
             csv_data = st.session_state.results_df.to_csv(index=False)
             st.download_button(
-                label="📄 Download CSV",
+                label="📄 Export CSV",
                 data=csv_data,
-                file_name="biblioagent_synthesis.csv",
+                file_name="muezza_audit_results.csv",
                 mime="text/csv",
                 use_container_width=True
             )
@@ -582,308 +1305,72 @@ def main():
         with export_cols[1]:
             json_data = st.session_state.results_df.to_json(orient="records", indent=2)
             st.download_button(
-                label="📋 Download JSON",
+                label="📋 Export JSON",
                 data=json_data,
-                file_name="biblioagent_synthesis.json",
+                file_name="muezza_audit_results.json",
                 mime="application/json",
                 use_container_width=True
             )
 
         with export_cols[2]:
-            stats = st.session_state.prisma_stats
-            prisma_report = f"""PRISMA 2020 Flow Diagram Report
-================================
-Generated by BiblioAgent AI
-Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-IDENTIFICATION
-- Records identified: {stats.identified}
-- Duplicates removed: {stats.duplicates_removed}
-
-SCREENING
-- Records screened: {stats.screened}
-- Records excluded: {stats.excluded_screening}
-
-RETRIEVAL
-- Reports sought: {stats.sought_retrieval}
-- Reports not retrieved: {stats.not_retrieved}
-
-INCLUDED
-- Reports assessed: {stats.assessed_eligibility}
-- Reports excluded: {stats.excluded_eligibility}
-- Studies in synthesis: {stats.included_synthesis}
-
-QUALITY DISTRIBUTION
-- High Quality: {st.session_state.quality_distribution.get('HIGH', 0)}
-- Moderate Quality: {st.session_state.quality_distribution.get('MODERATE', 0)}
-- Low Quality: {st.session_state.quality_distribution.get('LOW', 0)}
-- Critical Risk: {st.session_state.quality_distribution.get('CRITICAL', 0)}
-"""
-            st.download_button(
-                label="📊 PRISMA Report",
-                data=prisma_report,
-                file_name="prisma_report.txt",
-                mime="text/plain",
-                use_container_width=True
-            )
+            st.button("📊 Export PRISMA", use_container_width=True)
 
         with export_cols[3]:
-            st.button("📧 Email Report", use_container_width=True, disabled=True)
+            st.button("📧 Share Report", use_container_width=True, disabled=True)
 
-        # Narrative Generation Section
-        st.divider()
-        st.subheader("📝 Generate Results Chapter (BAB IV)")
-        st.markdown("""
-        <div style="background: #F0FDF4; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-            <p style="margin: 0; color: #065F46;">
-                <strong>Narrative Generator</strong> akan menyusun draf bab "Hasil dan Pembahasan"
-                dalam bahasa Indonesia formal untuk laporan riset Anda.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+    # ========== DRAFTING PREVIEW ==========
+    st.markdown("---")
+    st.markdown("""
+    <div class="section-header">
+        <div class="icon">📝</div>
+        <h2>Research Report Drafting</h2>
+    </div>
+    """, unsafe_allow_html=True)
 
-        narrative_cols = st.columns([2, 1])
+    # Author Information
+    author_cols = st.columns([2, 2, 1])
 
-        with narrative_cols[0]:
-            research_title = st.text_input(
-                "Judul Penelitian",
-                placeholder="Contoh: Systematic Review tentang Penerapan AI dalam Diagnosis Medis",
-                help="Judul penelitian akan digunakan dalam konteks narasi"
-            )
+    with author_cols[0]:
+        researcher_name = st.text_input(
+            "👤 Researcher Name",
+            value=st.session_state.researcher_name,
+            placeholder="Dr. Ahmad Researcher"
+        )
+        if researcher_name:
+            st.session_state.researcher_name = researcher_name
 
-        with narrative_cols[1]:
-            use_llm = st.checkbox(
-                "Gunakan Claude AI",
-                value=True,
-                help="Menggunakan Claude AI untuk narasi lebih natural (memerlukan API key)"
-            )
+    with author_cols[1]:
+        institution = st.text_input(
+            "🏛️ Institution",
+            value=st.session_state.institution,
+            placeholder="Universitas Indonesia"
+        )
+        if institution:
+            st.session_state.institution = institution
 
-        generate_narrative_btn = st.button(
-            "🖊️ Generate Narrative Chapter",
+    with author_cols[2]:
+        use_ai = st.checkbox("🤖 Use Claude AI", value=True)
+
+    # Generate Report Button
+    if st.session_state.slr_state:
+        generate_btn = st.button(
+            "✨ Generate Full Report",
             type="primary",
             use_container_width=True,
-            disabled=st.session_state.narrative_generating
+            disabled=st.session_state.report_generating
         )
 
-        if generate_narrative_btn and st.session_state.slr_state:
-            st.session_state.narrative_generating = True
-
-            with st.spinner("Generating narrative chapter..."):
-                try:
-                    # Prepare SLR results for narrative generation
-                    slr_results = {
-                        "prisma_stats": {
-                            "identified": st.session_state.prisma_stats.identified,
-                            "duplicates_removed": st.session_state.prisma_stats.duplicates_removed,
-                            "screened": st.session_state.prisma_stats.screened,
-                            "excluded_screening": st.session_state.prisma_stats.excluded_screening,
-                            "sought_retrieval": st.session_state.prisma_stats.sought_retrieval,
-                            "not_retrieved": st.session_state.prisma_stats.not_retrieved,
-                            "assessed_eligibility": st.session_state.prisma_stats.assessed_eligibility,
-                            "excluded_eligibility": st.session_state.prisma_stats.excluded_eligibility,
-                            "included_synthesis": st.session_state.prisma_stats.included_synthesis,
-                        },
-                        "exclusion_reasons": st.session_state.slr_state.get("exclusion_reasons", {}),
-                        "synthesis_ready": st.session_state.slr_state.get("synthesis_ready", []),
-                        "assessed_papers": st.session_state.slr_state.get("assessed_papers", []),
-                        "research_question": st.session_state.slr_state.get("research_question", research_title or ""),
-                    }
-
-                    # Generate narrative using NarrativeGenerator directly
-                    async def generate_narratives():
-                        anthropic_client = None
-                        if use_llm and settings.anthropic_api_key:
-                            try:
-                                from anthropic import AsyncAnthropic
-                                anthropic_client = AsyncAnthropic(api_key=settings.anthropic_api_key)
-                            except ImportError:
-                                pass
-
-                        generator = NarrativeGenerator(anthropic_client=anthropic_client)
-                        narratives = await generator.generate_full_chapter(slr_results)
-                        return generator, narratives
-
-                    generator, narratives = asyncio.run(generate_narratives())
-                    st.session_state.generated_narratives = narratives
-                    st.session_state.narrative_generator = generator
-
-                    st.success("Narrative chapter generated successfully!")
-
-                except Exception as e:
-                    st.error(f"Error generating narrative: {str(e)}")
-                finally:
-                    st.session_state.narrative_generating = False
-                    st.rerun()
-
-        # Display Generated Narratives
-        if st.session_state.generated_narratives:
-            st.divider()
-            st.subheader("📖 Generated Chapter Preview")
-
-            narratives = st.session_state.generated_narratives
-
-            # Section tabs
-            section_tabs = st.tabs([
-                "4.1 PRISMA Flow",
-                "4.2 Karakteristik",
-                "4.3 Kualitas",
-                "4.4 Sintesis Tematik",
-                "4.5 Pembahasan",
-                "4.6 Keterbatasan"
-            ])
-
-            section_keys = [
-                "prisma_flow", "study_characteristics", "quality_assessment",
-                "thematic_synthesis", "discussion", "limitations"
-            ]
-
-            for tab, key in zip(section_tabs, section_keys):
-                with tab:
-                    if key in narratives:
-                        narrative = narratives[key]
-                        st.markdown(f"### {narrative.title}")
-                        st.markdown(narrative.content)
-                        st.caption(f"Word count: {narrative.word_count}")
-
-            # Export Narrative Options
-            st.divider()
-            st.subheader("📤 Export Narrative")
-            narrative_export_cols = st.columns(3)
-
-            with narrative_export_cols[0]:
-                # Export to Markdown
-                if st.session_state.narrative_generator:
-                    md_content = st.session_state.narrative_generator.export_to_markdown()
-                    st.download_button(
-                        label="📄 Download Markdown",
-                        data=md_content,
-                        file_name="bab_iv_hasil_pembahasan.md",
-                        mime="text/markdown",
-                        use_container_width=True
-                    )
-
-            with narrative_export_cols[1]:
-                # Export to Word
-                word_btn = st.button(
-                    "📝 Generate Word Document",
-                    use_container_width=True
-                )
-
-                if word_btn and st.session_state.narrative_generator:
-                    try:
-                        import tempfile
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-                            tmp_path = tmp.name
-
-                        success = st.session_state.narrative_generator.export_to_word(tmp_path)
-
-                        if success:
-                            with open(tmp_path, "rb") as f:
-                                word_data = f.read()
-
-                            st.download_button(
-                                label="⬇️ Download Word File",
-                                data=word_data,
-                                file_name="bab_iv_hasil_pembahasan.docx",
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                use_container_width=True
-                            )
-                            os.unlink(tmp_path)
-                        else:
-                            st.warning("python-docx not installed. Install with: pip install python-docx")
-                    except Exception as e:
-                        st.error(f"Error creating Word document: {str(e)}")
-
-            with narrative_export_cols[2]:
-                # Copy to clipboard button (via text area)
-                if st.button("📋 Show Full Text", use_container_width=True):
-                    full_text = st.session_state.narrative_generator.export_to_markdown()
-                    st.text_area(
-                        "Full Narrative (copy from here)",
-                        value=full_text,
-                        height=400
-                    )
-
-        # Full Research Report Section
-        st.divider()
-        st.subheader("📚 Generate Full Research Report (5 Chapters)")
-        st.markdown("""
-        <div style="background: #EEF2FF; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-            <p style="margin: 0; color: #3730A3;">
-                <strong>Full Report Generator</strong> akan menyusun laporan penelitian lengkap 5 bab
-                dalam bahasa Indonesia formal akademik standar jurnal Q1.
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Author Information
-        author_cols = st.columns([2, 2])
-
-        with author_cols[0]:
-            researcher_name = st.text_input(
-                "Nama Peneliti",
-                value=st.session_state.researcher_name,
-                placeholder="Contoh: M. Sopian Hadianto",
-                key="researcher_name_input"
-            )
-            if researcher_name:
-                st.session_state.researcher_name = researcher_name
-
-        with author_cols[1]:
-            institution = st.text_input(
-                "Institusi",
-                value=st.session_state.institution,
-                placeholder="Contoh: Universitas Indonesia",
-                key="institution_input"
-            )
-            if institution:
-                st.session_state.institution = institution
-
-        report_cols = st.columns([2, 1, 1])
-
-        with report_cols[0]:
-            report_title = st.text_input(
-                "Judul Penelitian Lengkap",
-                value=st.session_state.slr_state.get("research_question", "") if st.session_state.slr_state else "",
-                placeholder="Contoh: Systematic Review Penerapan AI dalam Diagnosis Kanker",
-                key="report_title_input"
-            )
-
-        with report_cols[1]:
-            use_llm_report = st.checkbox(
-                "Gunakan Claude AI",
-                value=True,
-                help="Menggunakan Claude AI untuk narasi lebih natural",
-                key="use_llm_report"
-            )
-
-        with report_cols[2]:
-            selected_chapters = st.multiselect(
-                "Pilih Bab",
-                options=["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5"],
-                default=["Bab 1", "Bab 3", "Bab 4", "Bab 5"],
-                help="Pilih bab yang ingin di-generate"
-            )
-
-        generate_report_btn = st.button(
-            "📝 Generate Full Report",
-            type="primary",
-            use_container_width=True,
-            disabled=st.session_state.report_generating,
-            key="generate_report_btn"
-        )
-
-        if generate_report_btn and st.session_state.slr_state:
+        if generate_btn:
             st.session_state.report_generating = True
 
-            with st.spinner("Generating full research report... This may take a few minutes."):
+            with st.spinner("Muezza is crafting your research report..."):
                 try:
+                    add_log_entry("Starting report generation...", "Muezza", "action")
+
                     # Prepare data
                     scopus_metadata = {
                         "total_results": st.session_state.prisma_stats.identified,
-                        "year_range": f"{st.session_state.slr_state.get('date_range', (2018, 2024))}",
-                        "top_sources": [],
-                        "publication_trend": {}
+                        "year_range": f"{start_year}-{end_year}",
                     }
 
                     extraction_table = st.session_state.slr_state.get("synthesis_ready", [])
@@ -905,643 +1392,225 @@ QUALITY DISTRIBUTION
                     papers = st.session_state.slr_state.get("synthesis_ready", [])
 
                     # Initialize orchestrator
-                    api_key = settings.anthropic_api_key if use_llm_report else None
+                    api_key = settings.anthropic_api_key if use_ai else None
                     orchestrator = NarrativeOrchestrator(api_key=api_key)
 
-                    # Generate selected chapters
+                    # Generate all chapters
                     progress_bar = st.progress(0)
-                    chapter_map = {
-                        "Bab 1": ("generate_bab_1_pendahuluan", [report_title, scopus_metadata]),
-                        "Bab 2": ("generate_bab_2_tinjauan_pustaka", [report_title, papers]),
-                        "Bab 3": ("generate_bab_3_metodologi", [prisma_stats]),
-                        "Bab 4": ("generate_bab_4_hasil_pembahasan", [report_title, extraction_table]),
-                        "Bab 5": ("generate_bab_5_kesimpulan", [report_title]),
-                    }
 
-                    for i, chapter_name in enumerate(selected_chapters):
-                        if chapter_name in chapter_map:
-                            method_name, args = chapter_map[chapter_name]
-                            method = getattr(orchestrator, method_name)
-                            st.text(f"Generating {chapter_name}...")
-                            method(*args)
-                            progress_bar.progress((i + 1) / len(selected_chapters))
+                    chapters = ["Bab 1", "Bab 2", "Bab 3", "Bab 4", "Bab 5"]
+                    for i, chapter in enumerate(chapters):
+                        add_log_entry(f"Generating {chapter}...", "Muezza", "action")
+                        progress_bar.progress((i + 1) / len(chapters))
+
+                        if chapter == "Bab 1":
+                            orchestrator.generate_bab_1_pendahuluan(research_question, scopus_metadata)
+                        elif chapter == "Bab 2":
+                            orchestrator.generate_bab_2_tinjauan_pustaka(research_question, papers)
+                        elif chapter == "Bab 3":
+                            orchestrator.generate_bab_3_metodologi(prisma_stats)
+                        elif chapter == "Bab 4":
+                            orchestrator.generate_bab_4_hasil_pembahasan(research_question, extraction_table)
+                        elif chapter == "Bab 5":
+                            orchestrator.generate_bab_5_kesimpulan(research_question)
 
                     st.session_state.report_orchestrator = orchestrator
                     st.session_state.full_report_chapters = orchestrator.chapters
 
-                    st.success(f"Full report generated! {len(orchestrator.chapters)} chapters created.")
+                    add_log_entry("Report generation completed!", "Muezza", "success")
+                    st.success("✨ Research report generated successfully!")
 
                 except Exception as e:
+                    add_log_entry(f"Error: {str(e)}", "Muezza", "error")
                     st.error(f"Error generating report: {str(e)}")
                 finally:
                     st.session_state.report_generating = False
                     st.rerun()
 
-        # Display Full Report
-        if st.session_state.full_report_chapters:
-            st.divider()
-            st.subheader("📖 Full Report Preview")
+    # Display Generated Chapters
+    if st.session_state.full_report_chapters:
+        chapters = st.session_state.full_report_chapters
 
-            chapters = st.session_state.full_report_chapters
+        # Chapter tabs
+        chapter_titles = {
+            "bab_1": "📖 Bab I - Pendahuluan",
+            "bab_2": "📚 Bab II - Tinjauan Pustaka",
+            "bab_3": "🔬 Bab III - Metodologi",
+            "bab_4": "📊 Bab IV - Hasil & Pembahasan",
+            "bab_5": "🎯 Bab V - Kesimpulan"
+        }
 
-            # Create tabs for each chapter
-            chapter_titles = {
-                "bab_1": "Bab I Pendahuluan",
-                "bab_2": "Bab II Tinjauan Pustaka",
-                "bab_3": "Bab III Metodologi",
-                "bab_4": "Bab IV Hasil",
-                "bab_5": "Bab V Kesimpulan"
-            }
+        available_tabs = []
+        available_keys = []
+        for key, chapter in chapters.items():
+            key_str = key.value if hasattr(key, 'value') else str(key)
+            tab_name = chapter_titles.get(key_str, key_str)
+            available_tabs.append(tab_name)
+            available_keys.append(key)
 
-            available_tabs = []
-            available_keys = []
-            for key, chapter in chapters.items():
-                tab_name = chapter_titles.get(key.value if hasattr(key, 'value') else str(key), str(key))
-                available_tabs.append(tab_name)
-                available_keys.append(key)
+        if available_tabs:
+            tabs = st.tabs(available_tabs)
 
-            if available_tabs:
-                report_tabs = st.tabs(available_tabs)
+            for tab, key in zip(tabs, available_keys):
+                with tab:
+                    chapter = chapters[key]
+                    st.markdown(f"## {chapter.title}")
+                    st.markdown(chapter.content)
+                    st.caption(f"📝 Word count: {chapter.word_count}")
 
-                for tab, key in zip(report_tabs, available_keys):
-                    with tab:
-                        chapter = chapters[key]
-                        st.markdown(f"### {chapter.title}")
-                        st.markdown(chapter.content)
-                        st.caption(f"Word count: {chapter.word_count}")
+        # Download Section
+        st.markdown("""
+        <div class="download-section">
+            <h3>📥 Download Your Research Report</h3>
+            <p style="color: var(--slate-400);">Export your complete systematic literature review in your preferred format</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-            # Export Full Report
-            st.divider()
-            st.subheader("📤 Export Full Report")
+        # Get bibliography
+        bibliography = []
+        if st.session_state.slr_state:
+            papers = st.session_state.slr_state.get("synthesis_ready", [])
+            for p in papers:
+                authors = p.get("authors", ["Unknown"])
+                if isinstance(authors, list):
+                    author_str = authors[0] if authors else "Unknown"
+                else:
+                    author_str = str(authors)
+                year = p.get("year", "n.d.")
+                title = p.get("title", "Untitled")
+                source = p.get("source_title", p.get("journal", ""))
+                doi = p.get("doi", "")
+                ref = f"{author_str} ({year}). {title}. {source}."
+                if doi:
+                    ref += f" https://doi.org/{doi}"
+                bibliography.append(ref)
 
-            # Get bibliography for export
-            bibliography = []
-            if st.session_state.citation_stitcher:
-                bibliography = st.session_state.citation_stitcher.get_used_references()
-            elif st.session_state.slr_state:
-                papers = st.session_state.slr_state.get("synthesis_ready", [])
-                for p in papers:
-                    authors = p.get("authors", ["Unknown"])
-                    if isinstance(authors, list):
-                        author_str = authors[0] if authors else "Unknown"
-                    else:
-                        author_str = str(authors)
-                    year = p.get("year", "n.d.")
-                    title = p.get("title", "Untitled")
-                    source = p.get("source_title", p.get("journal", ""))
-                    doi = p.get("doi", "")
-                    ref = f"{author_str} ({year}). {title}. {source}."
-                    if doi:
-                        ref += f" https://doi.org/{doi}"
-                    bibliography.append(ref)
+        st.session_state.generated_bibliography = bibliography
 
-            st.session_state.generated_bibliography = bibliography
+        download_cols = st.columns(4)
 
-            report_export_cols = st.columns(4)
+        with download_cols[0]:
+            md_report = st.session_state.report_orchestrator.export_to_markdown()
+            st.download_button(
+                label="📄 Markdown",
+                data=md_report,
+                file_name="muezza_research_report.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
 
-            with report_export_cols[0]:
-                if st.session_state.report_orchestrator:
-                    md_report = st.session_state.report_orchestrator.export_to_markdown()
-                    st.download_button(
-                        label="📄 Markdown",
-                        data=md_report,
-                        file_name="laporan_penelitian_lengkap.md",
-                        mime="text/markdown",
-                        use_container_width=True,
-                        key="download_full_md"
-                    )
+        with download_cols[1]:
+            word_btn = st.button("📝 Word (Simple)", use_container_width=True)
 
-            with report_export_cols[1]:
-                word_report_btn = st.button(
-                    "📝 Word (Simple)",
-                    use_container_width=True,
-                    key="generate_full_word"
-                )
+            if word_btn:
+                try:
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+                        tmp_path = tmp.name
 
-                if word_report_btn and st.session_state.report_orchestrator:
-                    try:
-                        import tempfile
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-                            tmp_path = tmp.name
+                    success = st.session_state.report_orchestrator.export_to_word(tmp_path)
 
-                        success = st.session_state.report_orchestrator.export_to_word(tmp_path)
-
-                        if success:
-                            with open(tmp_path, "rb") as f:
-                                word_data = f.read()
-
-                            st.download_button(
-                                label="⬇️ Download Word",
-                                data=word_data,
-                                file_name="laporan_penelitian_lengkap.docx",
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                use_container_width=True,
-                                key="download_full_docx"
-                            )
-                            os.unlink(tmp_path)
-                        else:
-                            st.warning("python-docx not installed")
-                    except Exception as e:
-                        st.error(f"Error: {str(e)}")
-
-            with report_export_cols[2]:
-                word_pro_btn = st.button(
-                    "📑 Word (Pro)",
-                    use_container_width=True,
-                    key="generate_pro_word",
-                    help="Dokumen profesional dengan halaman judul, styling, dan daftar pustaka"
-                )
-
-                if word_pro_btn and st.session_state.full_report_chapters:
-                    try:
-                        import tempfile
-
-                        # Prepare chapters dict for DocxGenerator
-                        chapters_dict = {}
-                        for chapter_type, chapter in st.session_state.full_report_chapters.items():
-                            key = chapter_type.value if hasattr(chapter_type, 'value') else str(chapter_type)
-                            # Convert to proper format
-                            key_map = {
-                                "bab_1": "BAB_I_PENDAHULUAN",
-                                "bab_2": "BAB_II_TINJAUAN_PUSTAKA",
-                                "bab_3": "BAB_III_METODOLOGI",
-                                "bab_4": "BAB_IV_HASIL_PEMBAHASAN",
-                                "bab_5": "BAB_V_KESIMPULAN"
-                            }
-                            formatted_key = key_map.get(key, key)
-                            chapters_dict[formatted_key] = chapter.content
-
-                        # Create temp file
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-                            tmp_path = tmp.name
-
-                        # Generate with DocxGenerator
-                        generator = DocxGenerator(
-                            researcher_name=st.session_state.researcher_name,
-                            institution=st.session_state.institution
-                        )
-
-                        report_title_val = report_title if report_title else "LAPORAN SYSTEMATIC LITERATURE REVIEW"
-
-                        generator.generate_report(
-                            chapters=chapters_dict,
-                            bibliography=st.session_state.generated_bibliography,
-                            filename=tmp_path,
-                            title=report_title_val,
-                            include_title_page=True
-                        )
-
+                    if success:
                         with open(tmp_path, "rb") as f:
                             word_data = f.read()
 
                         st.download_button(
-                            label="⬇️ Download Pro",
+                            label="⬇️ Download",
                             data=word_data,
-                            file_name=f"Laporan_SLR_{st.session_state.researcher_name.replace(' ', '_')}.docx",
+                            file_name="muezza_research_report.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            use_container_width=True,
-                            key="download_pro_docx"
+                            use_container_width=True
                         )
                         os.unlink(tmp_path)
-                        st.success("Professional document generated!")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
-                    except Exception as e:
-                        st.error(f"Error creating document: {str(e)}")
+        with download_cols[2]:
+            word_pro_btn = st.button("📑 Word (Pro)", use_container_width=True)
 
-            with report_export_cols[3]:
-                if st.button("📋 Show Text", use_container_width=True, key="show_full_report"):
-                    full_report = st.session_state.report_orchestrator.export_to_markdown()
-                    st.text_area(
-                        "Full Report (copy from here)",
-                        value=full_report,
-                        height=500,
-                        key="full_report_text"
+            if word_pro_btn:
+                try:
+                    import tempfile
+
+                    chapters_dict = {}
+                    for chapter_type, chapter in st.session_state.full_report_chapters.items():
+                        key = chapter_type.value if hasattr(chapter_type, 'value') else str(chapter_type)
+                        key_map = {
+                            "bab_1": "BAB_I_PENDAHULUAN",
+                            "bab_2": "BAB_II_TINJAUAN_PUSTAKA",
+                            "bab_3": "BAB_III_METODOLOGI",
+                            "bab_4": "BAB_IV_HASIL_PEMBAHASAN",
+                            "bab_5": "BAB_V_KESIMPULAN"
+                        }
+                        formatted_key = key_map.get(key, key)
+                        chapters_dict[formatted_key] = chapter.content
+
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+                        tmp_path = tmp.name
+
+                    generator = DocxGenerator(
+                        researcher_name=st.session_state.researcher_name,
+                        institution=st.session_state.institution
                     )
 
-            # Bibliography Preview
-            if st.session_state.generated_bibliography:
-                with st.expander(f"📚 Daftar Pustaka ({len(st.session_state.generated_bibliography)} entri)"):
-                    for ref in sorted(st.session_state.generated_bibliography)[:20]:
-                        st.markdown(f"- {ref}")
-
-        # Expert Features Section
-        st.divider()
-        st.subheader("🎓 Expert Features")
-
-        expert_tabs = st.tabs(["📚 Citation Auto-Stitcher", "🔗 Logic Continuity Check", "🔬 Forensic Audit"])
-
-        # Tab 1: Citation Auto-Stitcher
-        with expert_tabs[0]:
-            st.markdown("""
-            <div style="background: #FEF3C7; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                <p style="margin: 0; color: #92400E;">
-                    <strong>Citation Auto-Stitcher</strong> secara otomatis mencocokkan nama penulis
-                    dalam narasi dengan daftar pustaka dari Scopus. Menghilangkan proses manual yang membosankan!
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-
-            citation_cols = st.columns([2, 1])
-
-            with citation_cols[0]:
-                bib_file = st.file_uploader(
-                    "Upload Bibliography File",
-                    type=["bib", "ris", "csv", "json"],
-                    help="Upload file dari Scopus export (.bib, .ris, .csv) atau JSON",
-                    key="bib_upload"
-                )
-
-            with citation_cols[1]:
-                citation_style = st.selectbox(
-                    "Citation Style",
-                    options=["APA 7th Edition", "Vancouver", "Harvard", "IEEE"],
-                    index=0,
-                    key="citation_style_select"
-                )
-
-            style_map = {
-                "APA 7th Edition": CitationStyle.APA7,
-                "Vancouver": CitationStyle.VANCOUVER,
-                "Harvard": CitationStyle.HARVARD,
-                "IEEE": CitationStyle.IEEE
-            }
-
-            if bib_file:
-                # Save uploaded file temporarily
-                import tempfile
-                with tempfile.NamedTemporaryFile(delete=False, suffix=f".{bib_file.name.split('.')[-1]}") as tmp:
-                    tmp.write(bib_file.getvalue())
-                    tmp_path = tmp.name
-
-                # Initialize stitcher
-                stitcher = CitationAutoStitcher(citation_style=style_map[citation_style])
-
-                # Load based on file type
-                ext = bib_file.name.split('.')[-1].lower()
-                if ext == 'bib':
-                    count = stitcher.load_bibtex(tmp_path)
-                elif ext == 'ris':
-                    count = stitcher.load_ris(tmp_path)
-                elif ext == 'csv':
-                    count = stitcher.load_scopus_csv(tmp_path)
-                elif ext == 'json':
-                    count = stitcher.load_json(tmp_path)
-                else:
-                    count = 0
-
-                os.unlink(tmp_path)
-
-                if count > 0:
-                    st.success(f"Loaded {count} bibliography entries")
-                    st.session_state.citation_stitcher = stitcher
-                    st.session_state.bibliography_loaded = True
-
-            # Also load from SLR papers if available
-            if st.session_state.slr_state and not st.session_state.bibliography_loaded:
-                papers = st.session_state.slr_state.get("synthesis_ready", [])
-                if papers:
-                    stitcher = CitationAutoStitcher(citation_style=style_map[citation_style])
-                    count = stitcher.load_from_papers(papers)
-                    if count > 0:
-                        st.info(f"Auto-loaded {count} entries from SLR results")
-                        st.session_state.citation_stitcher = stitcher
-
-            if st.session_state.citation_stitcher and st.session_state.full_report_chapters:
-                if st.button("🔄 Auto-Stitch Citations", type="primary", use_container_width=True, key="stitch_btn"):
-                    with st.spinner("Stitching citations..."):
-                        stitcher = st.session_state.citation_stitcher
-                        stitched_chapters = {}
-
-                        for chapter_type, chapter in st.session_state.full_report_chapters.items():
-                            result = stitcher.stitch_citations(chapter.content)
-                            chapter.content = result.stitched_text
-                            stitched_chapters[chapter_type] = result
-
-                        total_citations = sum(r.citations_added for r in stitched_chapters.values())
-                        st.success(f"Added {total_citations} citations across all chapters!")
-
-                        # Show warnings if any
-                        all_warnings = []
-                        for result in stitched_chapters.values():
-                            all_warnings.extend(result.warnings)
-
-                        if all_warnings:
-                            with st.expander(f"Warnings ({len(all_warnings)})"):
-                                for w in all_warnings[:10]:
-                                    st.warning(w)
-
-                        # Generate bibliography
-                        bibliography = stitcher.format_bibliography()
-                        st.markdown("### Generated Bibliography")
-                        st.markdown(bibliography)
-
-        # Tab 2: Logic Continuity Check
-        with expert_tabs[1]:
-            st.markdown("""
-            <div style="background: #DBEAFE; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                <p style="margin: 0; color: #1E40AF;">
-                    <strong>Logic Continuity Agent</strong> membaca Bab 1-5 untuk memastikan
-                    "benang merah" riset tidak terputus. Dijalankan sebelum finalisasi dokumen.
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-
-            if st.session_state.full_report_chapters:
-                continuity_cols = st.columns([3, 1])
-
-                with continuity_cols[0]:
-                    rq_input = st.text_input(
-                        "Research Question (optional)",
-                        value=st.session_state.slr_state.get("research_question", "") if st.session_state.slr_state else "",
-                        placeholder="Pertanyaan penelitian utama...",
-                        key="rq_continuity"
+                    generator.generate_report(
+                        chapters=chapters_dict,
+                        bibliography=st.session_state.generated_bibliography,
+                        filename=tmp_path,
+                        title="LAPORAN SYSTEMATIC LITERATURE REVIEW",
+                        include_title_page=True
                     )
 
-                with continuity_cols[1]:
-                    use_llm_check = st.checkbox(
-                        "Use Claude AI",
-                        value=True,
-                        help="Analisis mendalam dengan Claude AI",
-                        key="use_llm_continuity"
-                    )
+                    with open(tmp_path, "rb") as f:
+                        word_data = f.read()
 
-                if st.button("🔍 Check Logic Continuity", type="primary", use_container_width=True, key="check_continuity_btn"):
-                    with st.spinner("Analyzing report continuity..."):
-                        # Prepare chapters dict
-                        chapters_dict = {}
-                        for chapter_type, chapter in st.session_state.full_report_chapters.items():
-                            key = chapter_type.value if hasattr(chapter_type, 'value') else str(chapter_type)
-                            chapters_dict[key] = chapter.content
-
-                        # Run analysis
-                        api_key = settings.anthropic_api_key if use_llm_check else None
-                        agent = LogicContinuityAgent(anthropic_api_key=api_key)
-                        report = agent.analyze_report(chapters_dict, rq_input)
-
-                        st.session_state.continuity_report = report
-
-                # Display continuity report
-                if st.session_state.continuity_report:
-                    report = st.session_state.continuity_report
-
-                    # Overall score with color
-                    score_color = "#10B981" if report.overall_score >= 70 else "#F59E0B" if report.overall_score >= 50 else "#EF4444"
-
-                    st.markdown(f"""
-                    <div style="text-align: center; padding: 1.5rem; background: linear-gradient(135deg, {score_color}22, {score_color}11); border-radius: 12px; margin: 1rem 0;">
-                        <h1 style="color: {score_color}; margin: 0; font-size: 3rem;">{report.overall_score:.0f}</h1>
-                        <p style="color: #6B7280; margin: 0.5rem 0 0 0;">Skor Kontinuitas Logis</p>
-                        <p style="color: {score_color}; font-weight: bold;">{'✅ COHERENT' if report.is_coherent else '⚠️ NEEDS REVISION'}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    # Score breakdown
-                    score_cols = st.columns(5)
-                    scores = [
-                        ("RQ Alignment", report.research_question_alignment),
-                        ("Method-Result", report.methodology_results_match),
-                        ("Conclusion", report.conclusion_support_score),
-                        ("Terminology", report.terminology_consistency),
-                        ("Transitions", report.transition_quality),
-                    ]
-
-                    for col, (label, score) in zip(score_cols, scores):
-                        with col:
-                            st.metric(label, f"{score:.0f}%")
-
-                    # Issues
-                    if report.issues:
-                        st.markdown("### Issues Found")
-
-                        critical = [i for i in report.issues if i.level.value == "critical"]
-                        warnings = [i for i in report.issues if i.level.value == "warning"]
-                        suggestions = [i for i in report.issues if i.level.value == "suggestion"]
-
-                        if critical:
-                            st.error(f"**{len(critical)} Critical Issues**")
-                            for issue in critical:
-                                st.markdown(f"- **{issue.chapter}**: {issue.description}")
-                                st.caption(f"  💡 {issue.suggestion}")
-
-                        if warnings:
-                            st.warning(f"**{len(warnings)} Warnings**")
-                            for issue in warnings:
-                                st.markdown(f"- **{issue.chapter}**: {issue.description}")
-                                st.caption(f"  💡 {issue.suggestion}")
-
-                        if suggestions:
-                            with st.expander(f"📝 {len(suggestions)} Suggestions"):
-                                for issue in suggestions:
-                                    st.markdown(f"- **{issue.chapter}**: {issue.description}")
-                                    st.caption(f"  💡 {issue.suggestion}")
-
-                    # Recommendations
-                    if report.recommendations:
-                        st.markdown("### Recommendations")
-                        for rec in report.recommendations:
-                            st.markdown(rec)
-
-                    # Download report
-                    agent = LogicContinuityAgent()
-                    report_text = agent.format_report(report)
                     st.download_button(
-                        "📥 Download Continuity Report",
-                        data=report_text,
-                        file_name="continuity_analysis_report.txt",
-                        mime="text/plain",
-                        use_container_width=True,
-                        key="download_continuity"
+                        label="⬇️ Download Pro",
+                        data=word_data,
+                        file_name=f"Muezza_SLR_{st.session_state.researcher_name.replace(' ', '_')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True
                     )
+                    os.unlink(tmp_path)
 
-            else:
-                st.info("Generate full report first to run continuity check.")
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
 
-        # Tab 3: Forensic Audit
-        with expert_tabs[2]:
-            st.markdown("""
-            <div style="background: #FEE2E2; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                <p style="margin: 0; color: #991B1B;">
-                    <strong>Forensic Audit Agent</strong> memverifikasi setiap sitasi dalam narasi
-                    dengan sumber asli di database. Memastikan setiap klaim didukung bukti!
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
+        with download_cols[3]:
+            json_report = json.dumps({
+                "metadata": {
+                    "researcher": st.session_state.researcher_name,
+                    "institution": st.session_state.institution,
+                    "generated_at": datetime.now().isoformat(),
+                    "tool": "Muezza AI v2.0"
+                },
+                "prisma_stats": {
+                    "identified": st.session_state.prisma_stats.identified,
+                    "included": st.session_state.prisma_stats.included_synthesis,
+                },
+                "bibliography_count": len(bibliography)
+            }, indent=2)
 
-            if st.session_state.full_report_chapters:
-                audit_cols = st.columns([3, 1])
+            st.download_button(
+                label="📋 Metadata",
+                data=json_report,
+                file_name="muezza_metadata.json",
+                mime="application/json",
+                use_container_width=True
+            )
 
-                with audit_cols[0]:
-                    audit_chapter = st.selectbox(
-                        "Select Chapter to Audit",
-                        options=["All Chapters"] + [
-                            f"{k.value if hasattr(k, 'value') else k}"
-                            for k in st.session_state.full_report_chapters.keys()
-                        ],
-                        key="audit_chapter_select"
-                    )
-
-                with audit_cols[1]:
-                    use_llm_audit = st.checkbox(
-                        "LLM Verification",
-                        value=True,
-                        help="Gunakan Claude AI untuk verifikasi mendalam",
-                        key="use_llm_audit"
-                    )
-
-                if st.button("🔬 Run Forensic Audit", type="primary", use_container_width=True, key="run_audit_btn"):
-                    with st.spinner("Auditing citations... This may take a moment."):
-                        # Initialize auditor with papers from SLR
-                        papers = []
-                        if st.session_state.slr_state:
-                            papers = st.session_state.slr_state.get("synthesis_ready", [])
-                            papers.extend(st.session_state.slr_state.get("assessed_papers", []))
-
-                        api_key = settings.anthropic_api_key if use_llm_audit else None
-                        auditor = ForensicAuditAgent(
-                            papers_data=papers,
-                            anthropic_api_key=api_key
-                        )
-
-                        if audit_chapter == "All Chapters":
-                            # Audit all chapters
-                            all_results = {}
-                            for chapter_type, chapter in st.session_state.full_report_chapters.items():
-                                key = chapter_type.value if hasattr(chapter_type, 'value') else str(chapter_type)
-                                result = auditor.verify_narrative(chapter.content, key)
-                                all_results[key] = result
-
-                            # Combine results
-                            total_citations = sum(r.total_citations for r in all_results.values())
-                            total_verified = sum(r.verified_count for r in all_results.values())
-                            total_partial = sum(r.partial_count for r in all_results.values())
-                            total_unverified = sum(r.unverified_count for r in all_results.values())
-                            total_not_found = sum(r.not_found_count for r in all_results.values())
-
-                            # Create combined evidences
-                            all_evidences = []
-                            for chapter_id, result in all_results.items():
-                                for ev in result.evidences:
-                                    ev.notes = f"[{chapter_id}] {ev.notes}"
-                                    all_evidences.append(ev)
-
-                            from agents.forensic_audit_agent import AuditResult
-                            combined_result = AuditResult(
-                                document_id="Full Report",
-                                total_citations=total_citations,
-                                verified_count=total_verified,
-                                partial_count=total_partial,
-                                unverified_count=total_unverified,
-                                not_found_count=total_not_found,
-                                verification_rate=(total_verified + total_partial * 0.5) / total_citations * 100 if total_citations > 0 else 0,
-                                evidences=all_evidences,
-                                summary=f"Combined audit of {len(all_results)} chapters"
-                            )
-                            st.session_state.forensic_audit_result = combined_result
-
-                        else:
-                            # Audit single chapter
-                            for chapter_type, chapter in st.session_state.full_report_chapters.items():
-                                key = chapter_type.value if hasattr(chapter_type, 'value') else str(chapter_type)
-                                if key in audit_chapter or audit_chapter in key:
-                                    result = auditor.verify_narrative(chapter.content, key)
-                                    st.session_state.forensic_audit_result = result
-                                    break
-
-                        st.success("Forensic audit complete!")
-
-                # Display audit results
-                if st.session_state.forensic_audit_result:
-                    result = st.session_state.forensic_audit_result
-
-                    # Verification rate with color
-                    rate = result.verification_rate
-                    rate_color = "#10B981" if rate >= 70 else "#F59E0B" if rate >= 40 else "#EF4444"
-
-                    st.markdown(f"""
-                    <div style="text-align: center; padding: 1.5rem; background: linear-gradient(135deg, {rate_color}22, {rate_color}11); border-radius: 12px; margin: 1rem 0;">
-                        <h1 style="color: {rate_color}; margin: 0; font-size: 3rem;">{rate:.0f}%</h1>
-                        <p style="color: #6B7280; margin: 0.5rem 0 0 0;">Tingkat Verifikasi Sitasi</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    # Statistics
-                    stat_cols = st.columns(4)
-                    stats = [
-                        ("✅ Verified", result.verified_count, "#10B981"),
-                        ("🔶 Partial", result.partial_count, "#F59E0B"),
-                        ("❌ Unverified", result.unverified_count, "#EF4444"),
-                        ("❓ Not Found", result.not_found_count, "#6B7280"),
-                    ]
-
-                    for col, (label, count, color) in zip(stat_cols, stats):
-                        with col:
-                            st.markdown(f"""
-                            <div style="text-align: center; padding: 0.5rem; background: {color}11; border-radius: 8px;">
-                                <div style="font-size: 1.5rem; font-weight: bold; color: {color};">{count}</div>
-                                <div style="font-size: 0.8rem; color: #6B7280;">{label}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                    # Evidence details
-                    if result.evidences:
-                        st.markdown("### Citation Evidence Details")
-
-                        # Filter options
-                        filter_status = st.multiselect(
-                            "Filter by Status",
-                            options=["verified", "partial", "unverified", "not_found", "needs_review"],
-                            default=["unverified", "not_found"],
-                            key="audit_filter"
-                        )
-
-                        filtered = [e for e in result.evidences if e.status.value in filter_status]
-
-                        for i, evidence in enumerate(filtered[:20], 1):  # Show max 20
-                            status_color = {
-                                VerificationStatus.VERIFIED: "#10B981",
-                                VerificationStatus.PARTIALLY_VERIFIED: "#F59E0B",
-                                VerificationStatus.UNVERIFIED: "#EF4444",
-                                VerificationStatus.SOURCE_NOT_FOUND: "#6B7280",
-                                VerificationStatus.NEEDS_REVIEW: "#8B5CF6"
-                            }
-
-                            with st.expander(f"{i}. [{evidence.status.value.upper()}] {evidence.citation_id[:40]}..."):
-                                st.markdown(f"**Klaim:** {evidence.original_claim}")
-                                st.markdown(f"**Similarity:** {evidence.similarity_score:.0%}")
-
-                                if evidence.source_title:
-                                    st.markdown(f"**Sumber:** {evidence.source_title}")
-
-                                if evidence.source_snippet:
-                                    st.markdown(f"**Snippet:** {evidence.source_snippet[:200]}...")
-
-                                st.caption(f"Notes: {evidence.notes}")
-
-                    # Download audit report
-                    auditor = ForensicAuditAgent()
-                    report_text = auditor.format_audit_report(result)
-                    st.download_button(
-                        "📥 Download Audit Report",
-                        data=report_text,
-                        file_name="forensic_audit_report.txt",
-                        mime="text/plain",
-                        use_container_width=True,
-                        key="download_audit"
-                    )
-
-            else:
-                st.info("Generate full report first to run forensic audit.")
-
-    # Footer
-    st.divider()
+    # ========== FOOTER ==========
+    st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; color: #6B7280; padding: 1rem;">
-        <p>
-            <strong>BiblioAgent AI</strong> | Multi-Agent Systematic Literature Review
-            <br>
-            Built with LangGraph, ChromaDB, Claude API, and Streamlit
-            <br>
-            <em>"Diamond-grade insights on a zero-dollar budget"</em>
+    <div style="text-align: center; padding: 2rem; color: var(--slate-500);">
+        <p style="font-size: 1.5rem; margin-bottom: 0.5rem;">🐱</p>
+        <p style="font-weight: 600; color: var(--emerald-400);">Muezza AI</p>
+        <p style="font-size: 0.85rem;">Faithful Research Companion</p>
+        <p style="font-size: 0.75rem; margin-top: 1rem; color: var(--slate-600);">
+            Built with LangGraph • ChromaDB • Claude AI • Streamlit
+        </p>
+        <p style="font-size: 0.7rem; color: var(--slate-600); font-style: italic;">
+            "Precision in Research, Integrity in Every Citation"
         </p>
     </div>
     """, unsafe_allow_html=True)
