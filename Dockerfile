@@ -1,29 +1,27 @@
-# Muezza AI Dockerfile - Updated 2026-01-22
-# Gunakan image Python yang ringan
+# Muezza AI Dockerfile
 FROM python:3.11-slim
 
-# Cache bust
-ARG CACHEBUST=1
-
-# Set working directory di dalam container
 WORKDIR /app
 
-# Instal dependensi sistem yang diperlukan
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements dan instal
+# Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy seluruh kode aplikasi Muezza AI
+# Copy application code
 COPY . .
 
-# Railway provides PORT env variable
-ENV PORT=8501
-EXPOSE $PORT
+# Make start script executable
+RUN chmod +x start.sh
 
-# Perintah untuk menjalankan Muezza AI Dashboard
-CMD streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
+# Default port (Railway overrides with PORT env)
+ENV PORT=8501
+EXPOSE 8501
+
+# Start the application
+CMD ["./start.sh"]
