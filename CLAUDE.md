@@ -16,6 +16,32 @@ cp .env.example .env  # Configure API keys
 streamlit run app.py --server.port 8502
 ```
 
+## Railway Deployment
+
+Live URL: https://muezza-ai.up.railway.app/
+
+**Deployment files:**
+- `Procfile` - Start command for Railway
+- `railway.toml` - Nixpacks builder configuration
+- `packages.txt` - System dependencies for Streamlit Cloud (also works with Nixpacks)
+
+**Deploy to Railway:**
+1. Connect GitHub repo to Railway
+2. Railway auto-detects `Procfile` and uses Nixpacks builder
+3. Set environment variables in Railway dashboard (Settings → Variables)
+4. Generate domain in Settings → Networking
+
+**Start command** (in `Procfile`):
+```
+web: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
+```
+
+**Required Railway Variables:**
+- `ANTHROPIC_API_KEY`
+- `SCOPUS_API_KEY`
+- `SEMANTIC_SCHOLAR_API_KEY` (optional)
+- `UNPAYWALL_EMAIL` (optional)
+
 ## Required Environment Variables
 
 ```env
