@@ -698,12 +698,21 @@ init_session_state()
 # ============================================================================
 def check_configuration() -> Dict[str, bool]:
     """Check if required API keys are configured."""
+    # Check if scholarly is available for Google Scholar
+    try:
+        from scholarly import scholarly
+        scholarly_available = True
+    except ImportError:
+        scholarly_available = False
+
     return {
         "anthropic": bool(settings.anthropic_api_key),
         "scopus": bool(settings.scopus_api_key),
         "semantic_scholar": bool(settings.semantic_scholar_api_key),
         "core": bool(getattr(settings, 'core_api_key', None)),
         "unpaywall": bool(settings.unpaywall_email),
+        "doaj": True,  # DOAJ is always available (free public API)
+        "google_scholar": scholarly_available,  # Available if scholarly installed
     }
 
 
@@ -1070,6 +1079,8 @@ def main():
         config = check_configuration()
         render_api_status_indicator("Scopus", config["scopus"])
         render_api_status_indicator("Semantic Scholar", config["semantic_scholar"])
+        render_api_status_indicator("DOAJ", config["doaj"])
+        render_api_status_indicator("Google Scholar", config["google_scholar"])
         render_api_status_indicator("CORE", config.get("core", False))
         render_api_status_indicator("Claude AI", config["anthropic"])
         render_api_status_indicator("Unpaywall", config["unpaywall"])
