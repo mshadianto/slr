@@ -3,6 +3,5 @@ builder = "nixpacks"
 
 [deploy]
 numReplicas = 1
-startCommand = "streamlit run app.py --server.address=0.0.0.0 --server.port=$PORT --server.headless=true --server.fileWatcherType=none"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5
