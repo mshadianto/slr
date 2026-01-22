@@ -34,6 +34,7 @@ from agents.narrative_orchestrator import NarrativeOrchestrator
 from agents.citation_stitcher import CitationAutoStitcher, CitationStyle
 from agents.logic_continuity_agent import LogicContinuityAgent
 from agents.forensic_audit_agent import ForensicAuditAgent, VerificationStatus
+from agents.docx_generator import DocxGenerator
 
 # Page configuration
 st.set_page_config(
@@ -138,6 +139,9 @@ def init_session_state():
         "continuity_report": None,
         "bibliography_loaded": False,
         "forensic_audit_result": None,
+        "researcher_name": "Peneliti",
+        "institution": "",
+        "generated_bibliography": [],
     }
 
     for key, default in defaults.items():
@@ -812,6 +816,29 @@ QUALITY DISTRIBUTION
         </div>
         """, unsafe_allow_html=True)
 
+        # Author Information
+        author_cols = st.columns([2, 2])
+
+        with author_cols[0]:
+            researcher_name = st.text_input(
+                "Nama Peneliti",
+                value=st.session_state.researcher_name,
+                placeholder="Contoh: M. Sopian Hadianto",
+                key="researcher_name_input"
+            )
+            if researcher_name:
+                st.session_state.researcher_name = researcher_name
+
+        with author_cols[1]:
+            institution = st.text_input(
+                "Institusi",
+                value=st.session_state.institution,
+                placeholder="Contoh: Universitas Indonesia",
+                key="institution_input"
+            )
+            if institution:
+                st.session_state.institution = institution
+
         report_cols = st.columns([2, 1, 1])
 
         with report_cols[0]:
@@ -946,13 +973,37 @@ QUALITY DISTRIBUTION
             # Export Full Report
             st.divider()
             st.subheader("📤 Export Full Report")
-            report_export_cols = st.columns(3)
+
+            # Get bibliography for export
+            bibliography = []
+            if st.session_state.citation_stitcher:
+                bibliography = st.session_state.citation_stitcher.get_used_references()
+            elif st.session_state.slr_state:
+                papers = st.session_state.slr_state.get("synthesis_ready", [])
+                for p in papers:
+                    authors = p.get("authors", ["Unknown"])
+                    if isinstance(authors, list):
+                        author_str = authors[0] if authors else "Unknown"
+                    else:
+                        author_str = str(authors)
+                    year = p.get("year", "n.d.")
+                    title = p.get("title", "Untitled")
+                    source = p.get("source_title", p.get("journal", ""))
+                    doi = p.get("doi", "")
+                    ref = f"{author_str} ({year}). {title}. {source}."
+                    if doi:
+                        ref += f" https://doi.org/{doi}"
+                    bibliography.append(ref)
+
+            st.session_state.generated_bibliography = bibliography
+
+            report_export_cols = st.columns(4)
 
             with report_export_cols[0]:
                 if st.session_state.report_orchestrator:
                     md_report = st.session_state.report_orchestrator.export_to_markdown()
                     st.download_button(
-                        label="📄 Download Markdown",
+                        label="📄 Markdown",
                         data=md_report,
                         file_name="laporan_penelitian_lengkap.md",
                         mime="text/markdown",
@@ -962,7 +1013,7 @@ QUALITY DISTRIBUTION
 
             with report_export_cols[1]:
                 word_report_btn = st.button(
-                    "📝 Generate Word Document",
+                    "📝 Word (Simple)",
                     use_container_width=True,
                     key="generate_full_word"
                 )
@@ -980,7 +1031,7 @@ QUALITY DISTRIBUTION
                                 word_data = f.read()
 
                             st.download_button(
-                                label="⬇️ Download Word File",
+                                label="⬇️ Download Word",
                                 data=word_data,
                                 file_name="laporan_penelitian_lengkap.docx",
                                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -989,12 +1040,76 @@ QUALITY DISTRIBUTION
                             )
                             os.unlink(tmp_path)
                         else:
-                            st.warning("python-docx not installed. Install with: pip install python-docx")
+                            st.warning("python-docx not installed")
                     except Exception as e:
-                        st.error(f"Error creating Word document: {str(e)}")
+                        st.error(f"Error: {str(e)}")
 
             with report_export_cols[2]:
-                if st.button("📋 Show Full Report Text", use_container_width=True, key="show_full_report"):
+                word_pro_btn = st.button(
+                    "📑 Word (Pro)",
+                    use_container_width=True,
+                    key="generate_pro_word",
+                    help="Dokumen profesional dengan halaman judul, styling, dan daftar pustaka"
+                )
+
+                if word_pro_btn and st.session_state.full_report_chapters:
+                    try:
+                        import tempfile
+
+                        # Prepare chapters dict for DocxGenerator
+                        chapters_dict = {}
+                        for chapter_type, chapter in st.session_state.full_report_chapters.items():
+                            key = chapter_type.value if hasattr(chapter_type, 'value') else str(chapter_type)
+                            # Convert to proper format
+                            key_map = {
+                                "bab_1": "BAB_I_PENDAHULUAN",
+                                "bab_2": "BAB_II_TINJAUAN_PUSTAKA",
+                                "bab_3": "BAB_III_METODOLOGI",
+                                "bab_4": "BAB_IV_HASIL_PEMBAHASAN",
+                                "bab_5": "BAB_V_KESIMPULAN"
+                            }
+                            formatted_key = key_map.get(key, key)
+                            chapters_dict[formatted_key] = chapter.content
+
+                        # Create temp file
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
+                            tmp_path = tmp.name
+
+                        # Generate with DocxGenerator
+                        generator = DocxGenerator(
+                            researcher_name=st.session_state.researcher_name,
+                            institution=st.session_state.institution
+                        )
+
+                        report_title_val = report_title if report_title else "LAPORAN SYSTEMATIC LITERATURE REVIEW"
+
+                        generator.generate_report(
+                            chapters=chapters_dict,
+                            bibliography=st.session_state.generated_bibliography,
+                            filename=tmp_path,
+                            title=report_title_val,
+                            include_title_page=True
+                        )
+
+                        with open(tmp_path, "rb") as f:
+                            word_data = f.read()
+
+                        st.download_button(
+                            label="⬇️ Download Pro",
+                            data=word_data,
+                            file_name=f"Laporan_SLR_{st.session_state.researcher_name.replace(' ', '_')}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True,
+                            key="download_pro_docx"
+                        )
+                        os.unlink(tmp_path)
+                        st.success("Professional document generated!")
+
+                    except Exception as e:
+                        st.error(f"Error creating document: {str(e)}")
+
+            with report_export_cols[3]:
+                if st.button("📋 Show Text", use_container_width=True, key="show_full_report"):
                     full_report = st.session_state.report_orchestrator.export_to_markdown()
                     st.text_area(
                         "Full Report (copy from here)",
@@ -1002,6 +1117,12 @@ QUALITY DISTRIBUTION
                         height=500,
                         key="full_report_text"
                     )
+
+            # Bibliography Preview
+            if st.session_state.generated_bibliography:
+                with st.expander(f"📚 Daftar Pustaka ({len(st.session_state.generated_bibliography)} entri)"):
+                    for ref in sorted(st.session_state.generated_bibliography)[:20]:
+                        st.markdown(f"- {ref}")
 
         # Expert Features Section
         st.divider()

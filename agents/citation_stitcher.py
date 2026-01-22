@@ -780,6 +780,38 @@ class CitationAutoStitcher:
 
         return ref
 
+    def get_used_references(self) -> List[str]:
+        """
+        Get list of formatted references for all loaded bibliography entries.
+
+        Returns:
+            List of formatted reference strings
+        """
+        references = []
+
+        sorted_entries = sorted(
+            self.bibliography,
+            key=lambda e: e.first_author_surname.lower()
+        )
+
+        for entry in sorted_entries:
+            if self.citation_style == CitationStyle.APA7:
+                ref = self._format_ref_apa7(entry)
+            elif self.citation_style == CitationStyle.VANCOUVER:
+                ref = self._format_ref_vancouver(entry)
+            elif self.citation_style == CitationStyle.IEEE:
+                ref = self._format_ref_ieee(entry)
+            else:
+                ref = self._format_ref_apa7(entry)
+
+            references.append(ref)
+
+        return references
+
+    def get_all_entries(self) -> List[BibEntry]:
+        """Get all bibliography entries."""
+        return self.bibliography
+
 
 def auto_stitch_citations(
     text: str,
