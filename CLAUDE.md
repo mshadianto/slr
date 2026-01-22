@@ -4,85 +4,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BiblioAgent AI is a Streamlit-based systematic literature review (SLR) automation system designed for PRISMA 2020 compliance. It uses a multi-agent architecture (LangGraph) combined with RAG (Retrieval-Augmented Generation) to automate search, screening, full-text acquisition, and quality assessment of academic papers.
+Muezza AI (formerly BiblioAgent AI) is a Streamlit-based systematic literature review (SLR) automation system for PRISMA 2020 compliance. It uses a multi-agent architecture (LangGraph) with RAG to automate search, screening, full-text acquisition, quality assessment, and **automated academic writing in formal Indonesian**.
 
 **Key Innovation**: BiblioHunter - intelligent paper retrieval with waterfall PDF acquisition and Virtual Full-Text synthesis for paywalled papers.
 
 ## Running the Application
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Copy environment template and configure API keys
-cp .env.example .env
-
-# Run the integrated dashboard
-streamlit run app.py
-
-# Or specify a different port if 8501 is in use
+cp .env.example .env  # Configure API keys
 streamlit run app.py --server.port 8502
 ```
 
-## Project Structure
-
-```
-C:\SLR/
-├── app.py                              # Main integrated Streamlit dashboard
-├── config.py                           # Pydantic settings management
-├── requirements.txt                    # Python dependencies
-├── .env.example                        # Environment template
-├── README.md                           # Project documentation
-├── CLAUDE.md                           # This file
-│
-├── agents/                             # Multi-agent system (LangGraph)
-│   ├── __init__.py
-│   ├── state.py                        # LangGraph state definitions (SLRState, Paper, PRISMAStats)
-│   ├── orchestrator.py                 # LangGraph workflow orchestration
-│   ├── search_agent.py                 # PICO parsing, Boolean query generation, Scopus search
-│   ├── screening_agent.py              # 4-phase screening with Claude API
-│   ├── scrounger_agent.py              # Full-text acquisition with BiblioHunter integration
-│   └── quality_agent.py                # JBI quality assessment
-│
-├── api/                                # External API clients
-│   ├── __init__.py
-│   ├── biblio_hunter.py                # Enhanced paper retrieval (NEW - main retrieval engine)
-│   ├── scopus.py                       # Scopus Search API
-│   ├── unpaywall.py                    # Unpaywall OA lookup
-│   ├── core_api.py                     # CORE aggregator
-│   ├── arxiv_api.py                    # ArXiv preprint search
-│   └── semantic_scholar.py             # Semantic Scholar API
-│
-├── rag/                                # RAG components
-│   ├── __init__.py
-│   └── chromadb_store.py               # ChromaDB vector store
-│
-├── docs/                               # Documentation
-│   └── BIBLIOGRAPHY_STRATEGY.md        # Bibliography acquisition strategy
-│
-├── BiblioAgent_Streamlit_Dashboard.py  # Original mock dashboard (legacy)
-├── BiblioAgent_Workflow.mermaid        # Workflow diagram
-└── BiblioAgent_AI_Technical_Blueprint.docx  # Technical specification
-```
-
-## Environment Variables
-
-Create a `.env` file (copy from `.env.example`):
+## Required Environment Variables
 
 ```env
-# Required
-ANTHROPIC_API_KEY=your_claude_api_key      # Required for screening/quality
-
-# Required for Search
-SCOPUS_API_KEY=your_scopus_api_key         # Required for Scopus search
-
-# Recommended for BiblioHunter
-SEMANTIC_SCHOLAR_API_KEY=your_s2_key       # Higher rate limits (100 req/5min → 1 req/sec)
-UNPAYWALL_EMAIL=your_email@domain.com      # Required for Unpaywall waterfall
-
-# Optional
-CORE_API_KEY=your_core_key                 # Optional CORE access
-CHROMA_PERSIST_DIR=./data/chroma_db        # Vector store location
+ANTHROPIC_API_KEY=sk-ant-...          # Required for screening/quality/narrative
+SCOPUS_API_KEY=your_scopus_key        # Required for Scopus search
+SEMANTIC_SCHOLAR_API_KEY=your_s2_key  # Recommended (higher rate limits)
+UNPAYWALL_EMAIL=your@email.com        # Recommended for PDF waterfall
+CORE_API_KEY=your_core_key            # Optional
 ```
 
 ## Architecture
@@ -90,154 +31,61 @@ CHROMA_PERSIST_DIR=./data/chroma_db        # Vector store location
 ### Multi-Agent Pipeline (LangGraph)
 
 ```
-Workflow: search_node → screening_node → acquisition_node → quality_node → END
+search_node → screening_node → acquisition_node → quality_node → END
+                                                        ↓
+                    narrative_generator → narrative_orchestrator → docx_export
 ```
 
-1. **Search Agent** (`agents/search_agent.py`)
-   - Parses PICO/SPIDER framework from research question
-   - Generates Boolean queries with MeSH term expansion
-   - Executes Scopus API search with auto-refinement
-   - Deduplicates using RapidFuzz title similarity
+**Core SLR Agents** (`agents/`):
+- `SearchAgent` - PICO parsing, Boolean query generation, Scopus search, RapidFuzz deduplication
+- `ScreeningAgent` - 4-phase screening (rule-based → semantic → Claude reasoning → human-in-loop)
+- `ScroungerAgent` - BiblioHunter integration for full-text acquisition
+- `QualityAgent` - JBI Critical Appraisal framework assessment
 
-2. **Screening Agent** (`agents/screening_agent.py`)
-   - Phase 1: Rule-based exclusion (doc type, language, patterns)
-   - Phase 2: Semantic similarity via sentence-transformers
-   - Phase 3: Claude API reasoning for borderline cases
-   - Phase 4: Human-in-the-loop flagging for uncertain papers
+**Report Generation Agents** (`agents/`):
+- `NarrativeGenerator` - BAB IV (Results chapter) in formal Indonesian
+- `NarrativeOrchestrator` - Full 5-chapter report (BAB I-V)
+- `CitationAutoStitcher` - Auto-match author names with bibliography (APA7/Vancouver styles)
+- `LogicContinuityAgent` - Ensure "benang merah" coherence across chapters
+- `ForensicAuditAgent` - Verify every citation against source database
+- `DocxGenerator` - Professional Word export with title page
 
-3. **Scrounger Agent** (`agents/scrounger_agent.py`) - **BiblioHunter Integrated**
-   - Uses BiblioHunter for intelligent paper acquisition
-   - Waterfall PDF retrieval: S2 → Unpaywall → CORE → ArXiv
-   - Virtual Full-Text synthesis for paywalled papers
-   - Parallel batch processing with caching
-   - Quality scoring per paper
+**State Management**:
+- `SLRState` - LangGraph TypedDict in `agents/state.py`
+- `SLROrchestrator` - Workflow runner in `agents/orchestrator.py`
 
-4. **Quality Agent** (`agents/quality_agent.py`)
-   - JBI Critical Appraisal framework
-   - Weighted criteria extraction
-   - Categories: HIGH (≥80), MODERATE (60-79), LOW (40-59), CRITICAL (<40)
+### BiblioHunter (`api/biblio_hunter.py`)
 
-## BiblioHunter (`api/biblio_hunter.py`)
-
-BiblioHunter is the core paper retrieval engine with these features:
-
-### Multi-Identifier Support
-```python
-hunter.hunt("10.1038/nature12373")      # DOI
-hunter.hunt("2303.08774")                # ArXiv ID
-hunter.hunt("PMID:12345678")             # PubMed ID
-hunter.hunt("attention is all you need") # Title search
-```
-
-### Waterfall PDF Retrieval
-```
-1. Semantic Scholar Open Access → PDF found? Return
-2. Unpaywall (Green/Gold OA)    → PDF found? Return
-3. CORE (200M+ papers)          → PDF found? Return
-4. ArXiv (title search)         → PDF found? Return
-5. Virtual Full-Text            → Generate synthesis
-```
-
-### Virtual Full-Text Generation
-When no PDF is available, generates content from:
-- **TL;DR** - One-sentence summary from Semantic Scholar
-- **Abstract** - Full paper abstract
-- **Citation Contexts** - Up to 15 snippets from citing papers
-- **Related Papers** - Semantically similar papers
-- **Key References** - Influential references from the paper
-
-### Key Classes
-
-| Class | Location | Purpose |
-|-------|----------|---------|
-| `BiblioHunter` | `api/biblio_hunter.py` | Main paper retrieval engine |
-| `PaperResult` | `api/biblio_hunter.py` | Structured retrieval result (dataclass) |
-| `BiblioHunterCache` | `api/biblio_hunter.py` | In-memory cache with TTL |
-| `ScroungerAgent` | `agents/scrounger_agent.py` | Acquisition phase using BiblioHunter |
-| `SLRState` | `agents/state.py` | LangGraph state TypedDict |
-| `SLROrchestrator` | `agents/orchestrator.py` | Workflow runner |
-
-### BiblioHunter Usage
+Core paper retrieval engine with waterfall PDF strategy:
 
 ```python
-from api.biblio_hunter import BiblioHunter, hunt_paper, batch_hunt_papers
+from api.biblio_hunter import BiblioHunter, hunt_paper
 
-# Quick single paper
+# Quick usage
 paper = hunt_paper("10.1038/nature12373")
 
-# Full-featured usage
-hunter = BiblioHunter(
-    s2_api_key="your_key",
-    unpaywall_email="your@email.com",
-    enable_cache=True,
-    download_dir="./pdfs"
-)
-
-# Single paper
+# Multi-identifier support: DOI, ArXiv ID, PMID, title search
+hunter = BiblioHunter(s2_api_key="...", unpaywall_email="...")
 result = hunter.hunt("10.1038/nature12373")
-print(result.title)
-print(result.tldr)
-print(result.full_text_source)  # semantic_scholar_oa / virtual_fulltext
-print(result.quality_score)     # 0-1 score
-
-# Batch processing with progress
-results = hunter.batch_hunt(
-    ["10.1038/nature12373", "2303.08774"],
-    max_workers=3,
-    progress_callback=lambda cur, tot, msg: print(f"[{cur}/{tot}] {msg}")
-)
-
-# Download PDF
-pdf_path = hunter.download_pdf(result)
-
-# Get stats
-print(hunter.get_stats())
-# {'total_requests': 5, 'cache_hits': 2, 'pdf_found': 3, 'virtual_fulltext_generated': 2}
 ```
 
-### Paper Result Fields
+**Waterfall Order**: Semantic Scholar OA → Unpaywall → CORE → ArXiv → Virtual Full-Text
 
-After retrieval, each paper has these fields:
+**Virtual Full-Text** (when no PDF available): Synthesizes content from TL;DR, abstract, citation contexts (up to 15 snippets), related papers, and key references.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `full_text` | str | PDF text or Virtual Full-Text content |
-| `full_text_source` | str | semantic_scholar_oa / unpaywall / core / arxiv / virtual_fulltext |
-| `pdf_url` | str | Direct PDF URL if available |
-| `tldr` | str | One-sentence summary |
-| `retrieval_confidence` | float | 0-1 confidence score |
-| `retrieval_quality_score` | float | 0-1 quality score |
-| `citation_contexts_count` | int | Number of citation contexts (VFT) |
-| `related_papers` | list | Related paper suggestions |
+### API Rate Limits
 
-## API Rate Limits
+| Service | Limit |
+|---------|-------|
+| Scopus | 5000 req/week, 9/sec |
+| Semantic Scholar | 100 req/5min (no key) / 1 req/sec (with key) |
+| Unpaywall | 100K req/day |
+| CORE | 10 req/sec |
+| ArXiv | 1 req/3sec |
 
-| Service | Limit | Client |
-|---------|-------|--------|
-| Scopus | 5000 req/week, 9/sec | `api/scopus.py` |
-| Semantic Scholar | 100 req/5min (no key) / 1 req/sec (with key) | `api/biblio_hunter.py` |
-| Unpaywall | 100K req/day | `api/biblio_hunter.py` |
-| CORE | 10 req/sec | `api/biblio_hunter.py` |
-| ArXiv | 1 req/3sec | `api/biblio_hunter.py` |
-
-## Quality Assessment (JBI Framework)
-
-| Criterion | Weight | Extraction Method |
-|-----------|--------|-------------------|
-| Study Design | 25% | Regex patterns + hierarchy scoring |
-| Sample Size | 20% | Numeric extraction with thresholds |
-| Control Group | 15% | Pattern matching |
-| Randomization | 15% | Keyword detection |
-| Blinding | 10% | Context analysis |
-| Statistical Methods | 10% | Method extraction |
-| Confidence Intervals | 5% | Numeric detection |
-
-## Common Commands
+## Testing Individual Components
 
 ```bash
-# Run the app
-streamlit run app.py --server.port 8502
-
 # Test BiblioHunter
 python -c "from api.biblio_hunter import hunt_paper; print(hunt_paper('10.1038/nature12373'))"
 
@@ -249,6 +97,13 @@ papers = [{'doi': '10.1038/nature12373'}]
 results = asyncio.run(acquire_papers(papers))
 print(results)
 "
+
+# Test narrative generation
+python -c "
+from agents import NarrativeOrchestrator
+orch = NarrativeOrchestrator(api_key='sk-ant-...')
+# orch.generate_full_report(research_question='...', ...)
+"
 ```
 
 ## Troubleshooting
@@ -257,20 +112,17 @@ print(results)
 |-------|----------|
 | Port 8501 in use | Use `--server.port 8502` |
 | Scopus 401 error | Check API key, use STANDARD view |
-| Rate limiting (429) | Add API keys, BiblioHunter handles backoff |
+| Rate limiting (429) | Add API keys; BiblioHunter handles backoff automatically |
 | numpy serialization | Use `enable_checkpointing=False` in orchestrator |
-| Module not found | Run `pip install -r requirements.txt` |
+
+## Quality Assessment (JBI Framework)
+
+Quality scores categorized as: HIGH (≥80), MODERATE (60-79), LOW (40-59), CRITICAL (<40)
+
+Weighted criteria: Study Design (25%), Sample Size (20%), Control Group (15%), Randomization (15%), Blinding (10%), Statistical Methods (10%), Confidence Intervals (5%)
 
 ## Theme Colors
 
 - Primary: #1E3A5F (dark blue)
 - Secondary: #2E8B57 (forest green)
 - Accent: #E67E22 (orange)
-- Success: #10B981, Warning: #F59E0B, Danger: #EF4444
-
-## Reference Files
-
-- `README.md`: Full project documentation
-- `BiblioAgent_Workflow.mermaid`: Visual workflow diagram
-- `BiblioAgent_AI_Technical_Blueprint.docx`: Original technical specification
-- `docs/BIBLIOGRAPHY_STRATEGY.md`: Bibliography acquisition strategy
