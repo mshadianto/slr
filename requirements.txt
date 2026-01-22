@@ -13,3 +13,4 @@ aiohttp
 sentence-transformers
 scholarly
 tenacity
+rapidfuzz
