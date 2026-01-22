@@ -586,7 +586,7 @@ If you use BiblioAgent AI in your research, please cite:
 ```bibtex
 @software{biblioagent2024,
   title = {BiblioAgent AI: Intelligent Multi-Agent System for Automated Systematic Literature Reviews},
-  year = {2024},
+  year = {2026},
   url = {https://github.com/yourusername/biblioagent-ai}
 }
 ```
