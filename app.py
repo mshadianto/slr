@@ -4,11 +4,31 @@ Muezza AI - Faithful Research Companion
 Premium Agentic Systematic Literature Review Dashboard.
 Enterprise-grade UI with modern, serene aesthetics.
 
+Developer: MS Hadianto
 Usage:
     streamlit run app.py
 """
 
 import streamlit as st
+
+# ============================================================================
+# APPLICATION METADATA
+# ============================================================================
+__version__ = "2.1.0"
+__author__ = "MS Hadianto"
+__app_name__ = "Muezza AI"
+__tagline__ = "Faithful Research Companion"
+__release_date__ = "2026-01-22"
+
+APP_INFO = {
+    "name": __app_name__,
+    "version": __version__,
+    "author": __author__,
+    "tagline": __tagline__,
+    "release_date": __release_date__,
+    "github": "https://github.com/mshadianto/slr",
+    "description": "Intelligent Systematic Literature Review Automation System"
+}
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -1022,13 +1042,13 @@ def main():
     """Main application entry point."""
 
     # ========== HEADER ==========
-    st.markdown("""
+    st.markdown(f"""
     <div class="main-header">
         <div style="display: flex; align-items: center; gap: 1rem;">
             <span class="muezza-logo">🐱</span>
             <div>
-                <h1>Muezza AI <span class="version-badge">v2.0</span></h1>
-                <p class="tagline">Faithful Research Companion — Your Intelligent SLR Automation System</p>
+                <h1>{APP_INFO['name']} <span class="version-badge">v{APP_INFO['version']}</span></h1>
+                <p class="tagline">{APP_INFO['tagline']} — {APP_INFO['description']}</p>
             </div>
         </div>
     </div>
@@ -1036,11 +1056,12 @@ def main():
 
     # ========== SIDEBAR ==========
     with st.sidebar:
-        st.markdown("""
+        st.markdown(f"""
         <div style="text-align: center; padding: 1rem 0; border-bottom: 1px solid var(--slate-700); margin-bottom: 1rem;">
             <span style="font-size: 2.5rem;">🐱</span>
-            <h2 style="margin: 0.5rem 0 0 0; color: var(--emerald-400);">Muezza AI</h2>
+            <h2 style="margin: 0.5rem 0 0 0; color: var(--emerald-400);">{APP_INFO['name']}</h2>
             <p style="font-size: 0.8rem; color: var(--slate-400); margin: 0;">Command Center</p>
+            <p style="font-size: 0.65rem; color: var(--gold-400); margin: 0.25rem 0 0 0;">v{APP_INFO['version']}</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1582,7 +1603,9 @@ def main():
                     "researcher": st.session_state.researcher_name,
                     "institution": st.session_state.institution,
                     "generated_at": datetime.now().isoformat(),
-                    "tool": "Muezza AI v2.0"
+                    "tool": f"{APP_INFO['name']} v{APP_INFO['version']}",
+                    "developer": APP_INFO['author'],
+                    "github": APP_INFO['github']
                 },
                 "prisma_stats": {
                     "identified": st.session_state.prisma_stats.identified,
@@ -1601,17 +1624,27 @@ def main():
 
     # ========== FOOTER ==========
     st.markdown("---")
-    st.markdown("""
+    st.markdown(f"""
     <div style="text-align: center; padding: 2rem; color: var(--slate-500);">
         <p style="font-size: 1.5rem; margin-bottom: 0.5rem;">🐱</p>
-        <p style="font-weight: 600; color: var(--emerald-400);">Muezza AI</p>
-        <p style="font-size: 0.85rem;">Faithful Research Companion</p>
+        <p style="font-weight: 600; color: var(--emerald-400);">{APP_INFO['name']}</p>
+        <p style="font-size: 0.85rem;">{APP_INFO['tagline']}</p>
         <p style="font-size: 0.75rem; margin-top: 1rem; color: var(--slate-600);">
             Built with LangGraph • ChromaDB • Claude AI • Streamlit
         </p>
         <p style="font-size: 0.7rem; color: var(--slate-600); font-style: italic;">
             "Precision in Research, Integrity in Every Citation"
         </p>
+        <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--slate-700);">
+            <p style="font-size: 0.75rem; color: var(--slate-500);">
+                <span style="color: var(--gold-400);">v{APP_INFO['version']}</span> •
+                Developed by <a href="{APP_INFO['github']}" target="_blank" style="color: var(--emerald-400); text-decoration: none;">{APP_INFO['author']}</a>
+            </p>
+            <p style="font-size: 0.65rem; color: var(--slate-600); margin-top: 0.25rem;">
+                Released: {APP_INFO['release_date']} •
+                <a href="{APP_INFO['github']}" target="_blank" style="color: var(--slate-500); text-decoration: none;">GitHub Repository</a>
+            </p>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
