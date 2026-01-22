@@ -7,3 +7,4 @@ chromadb
 python-docx
 requests
 python-dotenv
+pydantic-settings
