@@ -21,8 +21,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy seluruh kode aplikasi Muezza AI
 COPY . .
 
-# Port default untuk Streamlit
-EXPOSE 8501
+# Railway provides PORT env variable
+ENV PORT=8501
+EXPOSE $PORT
 
 # Perintah untuk menjalankan Muezza AI Dashboard
-CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
