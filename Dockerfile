@@ -4,11 +4,10 @@ FROM python:3.11-slim
 # Set working directory di dalam container
 WORKDIR /app
 
-# Instal dependensi sistem yang diperlukan untuk R-bridge atau library C
+# Instal dependensi sistem yang diperlukan
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
-    software-properties-common \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements dan instal
