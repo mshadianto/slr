@@ -1,9 +1,1 @@
 streamlit
-pandas
-plotly
-langgraph
-langchain-anthropic
-chromadb
-python-docx
-requests
-python-dotenv
