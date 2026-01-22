@@ -16,12 +16,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Make start script executable
-RUN chmod +x start.sh
-
-# Default port (Railway overrides with PORT env)
+# Railway sets PORT env variable (default 8501)
 ENV PORT=8501
-EXPOSE 8501
 
-# Start the application
-CMD ["./start.sh"]
+EXPOSE ${PORT}
+
+# Run Streamlit (shell form to expand $PORT)
+CMD sh -c "streamlit run app.py --server.address=0.0.0.0 --server.port=${PORT} --server.headless=true --server.fileWatcherType=none"
