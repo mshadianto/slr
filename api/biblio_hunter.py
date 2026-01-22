@@ -128,8 +128,10 @@ class BiblioHunter:
     PDF Sources (waterfall):
     1. Semantic Scholar Open Access
     2. Unpaywall
-    3. CORE
-    4. ArXiv
+    3. DOAJ (Directory of Open Access Journals)
+    4. CORE
+    5. ArXiv
+    6. Google Scholar (fallback)
 
     When no PDF available:
     - Generates Virtual Full-Text from abstract + citation contexts + TL;DR
@@ -140,6 +142,8 @@ class BiblioHunter:
         s2_api_key: str = None,
         unpaywall_email: str = None,
         core_api_key: str = None,
+        enable_doaj: bool = True,
+        enable_google_scholar: bool = False,
         enable_cache: bool = True,
         cache_ttl_hours: int = 24,
         download_dir: str = None
@@ -151,6 +155,8 @@ class BiblioHunter:
             s2_api_key: Semantic Scholar API key (optional but recommended)
             unpaywall_email: Email for Unpaywall API (required for Unpaywall)
             core_api_key: CORE API key (optional)
+            enable_doaj: Enable DOAJ search (default True, no API key needed)
+            enable_google_scholar: Enable Google Scholar (default False, has strict rate limits)
             enable_cache: Whether to cache results
             cache_ttl_hours: Cache TTL in hours
             download_dir: Directory for downloaded PDFs
@@ -158,11 +164,14 @@ class BiblioHunter:
         self.s2_api_key = s2_api_key
         self.unpaywall_email = unpaywall_email
         self.core_api_key = core_api_key
+        self.enable_doaj = enable_doaj
+        self.enable_google_scholar = enable_google_scholar
 
         self.s2_base_url = "https://api.semanticscholar.org/graph/v1"
         self.unpaywall_base_url = "https://api.unpaywall.org/v2"
         self.core_base_url = "https://api.core.ac.uk/v3"
         self.arxiv_base_url = "http://export.arxiv.org/api/query"
+        self.doaj_base_url = "https://doaj.org/api/search/articles"
 
         self.request_count = 0
         self.last_request_time = 0
@@ -468,7 +477,19 @@ class BiblioHunter:
                 logger.info(f"PDF found via Unpaywall: {doi}")
                 return result
 
-        # 2. Try CORE
+        # 2. Try DOAJ (guaranteed Open Access)
+        if self.enable_doaj:
+            pdf_url = self._try_doaj(doi, result.title)
+            if pdf_url:
+                result.pdf_url = pdf_url
+                result.pdf_source = 'doaj'
+                result.full_text_source = 'doaj'
+                result.retrieval_confidence = 1.0  # DOAJ is guaranteed OA
+                self.stats['pdf_found'] += 1
+                logger.info(f"PDF found via DOAJ: {doi}")
+                return result
+
+        # 3. Try CORE
         if self.core_api_key:
             pdf_url = self._try_core(doi)
             if pdf_url:
@@ -480,7 +501,7 @@ class BiblioHunter:
                 logger.info(f"PDF found via CORE: {doi}")
                 return result
 
-        # 3. Try ArXiv (check if paper has ArXiv version)
+        # 4. Try ArXiv (check if paper has ArXiv version)
         arxiv_url = self._try_arxiv_for_doi(doi, result.title)
         if arxiv_url:
             result.pdf_url = arxiv_url
@@ -490,6 +511,18 @@ class BiblioHunter:
             self.stats['pdf_found'] += 1
             logger.info(f"PDF found via ArXiv: {doi}")
             return result
+
+        # 5. Try Google Scholar (fallback, has strict rate limits)
+        if self.enable_google_scholar and result.title:
+            pdf_url = self._try_google_scholar(result.title)
+            if pdf_url:
+                result.pdf_url = pdf_url
+                result.pdf_source = 'google_scholar'
+                result.full_text_source = 'google_scholar'
+                result.retrieval_confidence = 0.85
+                self.stats['pdf_found'] += 1
+                logger.info(f"PDF found via Google Scholar: {doi}")
+                return result
 
         return result
 
@@ -597,6 +630,76 @@ class BiblioHunter:
         intersection = len(t1 & t2)
         union = len(t1 | t2)
         return intersection / union if union > 0 else 0.0
+
+    def _try_doaj(self, doi: str, title: str) -> Optional[str]:
+        """Try to get PDF from DOAJ (Directory of Open Access Journals)."""
+        self._rate_limit(0.5)  # DOAJ is generous with rate limits
+
+        try:
+            # First try by DOI
+            if doi:
+                query = f'doi:"{doi}"'
+                params = {'q': query, 'pageSize': 1}
+                response = requests.get(self.doaj_base_url, params=params, timeout=15)
+                self.request_count += 1
+
+                if response.status_code == 200:
+                    data = response.json()
+                    results = data.get('results', [])
+                    if results:
+                        bibjson = results[0].get('bibjson', {})
+                        links = bibjson.get('link', [])
+                        for link in links:
+                            if link.get('type') == 'fulltext':
+                                return link.get('url')
+
+            # Fallback: search by title
+            if title:
+                self._rate_limit(0.5)
+                title_escaped = title.replace('"', '\\"')[:200]
+                query = f'bibjson.title:"{title_escaped}"'
+                params = {'q': query, 'pageSize': 3}
+                response = requests.get(self.doaj_base_url, params=params, timeout=15)
+                self.request_count += 1
+
+                if response.status_code == 200:
+                    data = response.json()
+                    results = data.get('results', [])
+                    for result in results:
+                        bibjson = result.get('bibjson', {})
+                        result_title = bibjson.get('title', '')
+                        if self._title_similarity(title, result_title) > 0.8:
+                            links = bibjson.get('link', [])
+                            for link in links:
+                                if link.get('type') == 'fulltext':
+                                    return link.get('url')
+
+        except Exception as e:
+            logger.debug(f"DOAJ error for {doi}: {e}")
+
+        return None
+
+    def _try_google_scholar(self, title: str) -> Optional[str]:
+        """Try to get PDF from Google Scholar (use sparingly due to rate limits)."""
+        try:
+            from api.google_scholar import GoogleScholarClient, SCHOLARLY_AVAILABLE
+            if not SCHOLARLY_AVAILABLE:
+                logger.debug("scholarly library not available")
+                return None
+
+            # Use synchronous call with longer rate limit
+            client = GoogleScholarClient(rate_limit_delay=10.0)
+            paper = client._get_paper_sync(title)
+
+            if paper and paper.get('eprint_url'):
+                return paper['eprint_url']
+
+        except ImportError:
+            logger.debug("Google Scholar client not available")
+        except Exception as e:
+            logger.debug(f"Google Scholar error for {title[:50]}: {e}")
+
+        return None
 
     def _generate_virtual_fulltext(
         self,

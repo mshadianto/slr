@@ -11,3 +11,5 @@ python-dotenv
 pydantic-settings
 aiohttp
 sentence-transformers
+scholarly
+tenacity
