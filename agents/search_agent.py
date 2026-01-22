@@ -168,20 +168,28 @@ class SearchAgent:
             'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'need',
             'what', 'how', 'why', 'when', 'where', 'which', 'who', 'whom',
             'this', 'that', 'these', 'those', 'it', 'its', 'they', 'their',
+            'effectiveness', 'effective', 'effect', 'effects', 'impact',
+            'using', 'used', 'use', 'based', 'study', 'studies', 'research',
+            'review', 'analysis', 'method', 'methods', 'approach', 'approaches',
+            'results', 'conclusion', 'published', 'articles', 'journal',
+            'between', 'among', 'through', 'during', 'before', 'after',
         }
 
-        # Extract words with 4+ characters
-        words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
+        # Extract words with 3+ characters (lowered threshold)
+        words = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
         keywords = [w for w in words if w not in stop_words]
 
-        # Return unique keywords (max 5)
+        # Prioritize longer, more specific words
+        keywords.sort(key=lambda x: len(x), reverse=True)
+
+        # Return unique keywords (max 8)
         seen = set()
         unique = []
         for kw in keywords:
             if kw not in seen:
                 seen.add(kw)
                 unique.append(kw)
-        return unique[:5]
+        return unique[:8]
 
     def generate_boolean_query(
         self,
@@ -202,66 +210,57 @@ class SearchAgent:
         Returns:
             Boolean query string for Scopus API
         """
-        pico = self.parse_pico(research_question)
+        # First try simple keyword extraction (more reliable)
+        keywords = self._extract_keywords(research_question)
 
-        query_parts = []
+        # Also extract from inclusion criteria if available
+        if inclusion_criteria:
+            for criterion in inclusion_criteria[:3]:
+                keywords.extend(self._extract_keywords(criterion))
 
-        # Build population terms
-        if pico.population:
-            pop_terms = [self._clean_term(t) for t in pico.population]
-            pop_terms = [t for t in pop_terms if t]  # Remove empty
-            if pop_terms:
-                pop_query = " OR ".join([f'"{t}"' for t in pop_terms[:3]])
-                query_parts.append(f"TITLE-ABS-KEY({pop_query})")
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_keywords = []
+        for kw in keywords:
+            if kw.lower() not in seen:
+                seen.add(kw.lower())
+                unique_keywords.append(kw)
 
-        # Build intervention terms
-        if pico.intervention:
-            int_terms = [self._clean_term(t) for t in pico.intervention]
-            int_terms = [t for t in int_terms if t]
-            if int_terms:
-                int_query = " OR ".join([f'"{t}"' for t in int_terms[:3]])
-                query_parts.append(f"TITLE-ABS-KEY({int_query})")
+        # Use top keywords for query
+        query_keywords = unique_keywords[:5]
 
-        # Build outcome terms
-        if pico.outcome:
-            out_terms = [self._clean_term(t) for t in pico.outcome]
-            out_terms = [t for t in out_terms if t]
-            if out_terms:
-                out_query = " OR ".join([f'"{t}"' for t in out_terms[:3]])
-                query_parts.append(f"TITLE-ABS-KEY({out_query})")
+        if not query_keywords:
+            # Ultimate fallback: use whole words from question
+            words = re.findall(r'\b[a-zA-Z]{3,}\b', research_question)
+            query_keywords = words[:5]
 
-        # Fallback: if no PICO elements found, use keyword extraction
-        if not query_parts:
-            keywords = self._extract_keywords(research_question)
-            if keywords:
-                kw_query = " AND ".join([f'"{kw}"' for kw in keywords[:4]])
-                query_parts.append(f"TITLE-ABS-KEY({kw_query})")
+        # Build simple but effective query
+        if len(query_keywords) >= 2:
+            # Use AND for first 2-3 important terms, makes query focused
+            main_terms = query_keywords[:3]
+            boolean_query = "TITLE-ABS-KEY(" + " AND ".join(main_terms) + ")"
+        else:
+            boolean_query = f"TITLE-ABS-KEY({query_keywords[0]})" if query_keywords else ""
 
-        # Combine with AND
-        boolean_query = " AND ".join(query_parts)
+        if not boolean_query:
+            logger.warning("Could not generate query from research question")
+            return ""
 
         # Add date range filter
         if date_range:
             start_year, end_year = date_range
             boolean_query += f" AND PUBYEAR > {start_year - 1} AND PUBYEAR < {end_year + 1}"
 
-        # Add language filter (English)
+        # Only add language filter, skip DOCTYPE to get more results
         boolean_query += ' AND LANGUAGE(english)'
-
-        # Add document type filter (exclude conferences, editorials)
-        boolean_query += ' AND DOCTYPE(ar OR re)'  # articles and reviews only
 
         self.generated_queries.append({
             "query": boolean_query,
-            "pico_elements": {
-                "population": pico.population,
-                "intervention": pico.intervention,
-                "comparison": pico.comparison,
-                "outcome": pico.outcome,
-            },
+            "keywords": query_keywords,
             "generated_at": datetime.now().isoformat(),
         })
 
+        logger.info(f"Generated query with keywords: {query_keywords}")
         return boolean_query
 
     def refine_query(self, original_query: str, result_count: int, target_range: Tuple[int, int] = (100, 1000)) -> str:
