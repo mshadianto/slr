@@ -16,6 +16,15 @@ from .citation_stitcher import CitationAutoStitcher, auto_stitch_citations, Cita
 from .logic_continuity_agent import LogicContinuityAgent, check_report_continuity
 from .forensic_audit_agent import ForensicAuditAgent, audit_narrative
 from .docx_generator import DocxGenerator, generate_slr_docx
+from .bibliometric_agent import (
+    BibliometricAgent,
+    BibliometricStats,
+    create_publication_trend_chart,
+    create_journal_distribution_chart,
+    create_citation_distribution_chart,
+    create_author_chart,
+    create_keyword_chart,
+)
 
 __all__ = [
     "SLRState",
@@ -40,4 +49,11 @@ __all__ = [
     "audit_narrative",
     "DocxGenerator",
     "generate_slr_docx",
+    "BibliometricAgent",
+    "BibliometricStats",
+    "create_publication_trend_chart",
+    "create_journal_distribution_chart",
+    "create_citation_distribution_chart",
+    "create_author_chart",
+    "create_keyword_chart",
 ]

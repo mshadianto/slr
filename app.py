@@ -1350,6 +1350,133 @@ def main():
         with export_cols[3]:
             st.button("📧 Share Report", use_container_width=True, disabled=True)
 
+    # ========== BIBLIOMETRIC ANALYSIS ==========
+    if st.session_state.slr_state and st.session_state.slr_state.get("synthesis_ready"):
+        st.markdown("---")
+        st.markdown("""
+        <div class="section-header">
+            <div class="icon">📊</div>
+            <h2>Bibliometric Analysis</h2>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Get papers for analysis
+        papers_for_analysis = st.session_state.slr_state.get("synthesis_ready", [])
+
+        if papers_for_analysis:
+            from agents.bibliometric_agent import (
+                BibliometricAgent,
+                create_publication_trend_chart,
+                create_journal_distribution_chart,
+                create_citation_distribution_chart,
+                create_author_chart,
+                create_keyword_chart,
+            )
+
+            # Perform analysis
+            biblio_agent = BibliometricAgent(papers_for_analysis)
+            stats = biblio_agent.analyze()
+
+            # Summary Metrics Row
+            metric_cols = st.columns(6)
+            with metric_cols[0]:
+                st.metric("Total Papers", stats.total_papers)
+            with metric_cols[1]:
+                st.metric("Total Citations", f"{stats.total_citations:,}")
+            with metric_cols[2]:
+                st.metric("Avg Citations", f"{stats.avg_citations:.1f}")
+            with metric_cols[3]:
+                st.metric("H-Index", stats.h_index)
+            with metric_cols[4]:
+                st.metric("Max Citations", stats.max_citations)
+            with metric_cols[5]:
+                st.metric("With Citations", f"{stats.papers_with_citations}")
+
+            st.markdown("---")
+
+            # Charts Row 1: Publication Trends & Citation Distribution
+            chart_cols1 = st.columns(2)
+
+            with chart_cols1[0]:
+                if stats.publication_years:
+                    trend_fig = create_publication_trend_chart(stats.publication_years)
+                    if trend_fig:
+                        st.plotly_chart(trend_fig, use_container_width=True)
+                else:
+                    st.info("No publication year data available")
+
+            with chart_cols1[1]:
+                if stats.citation_distribution:
+                    cite_fig = create_citation_distribution_chart(stats.citation_distribution)
+                    if cite_fig:
+                        st.plotly_chart(cite_fig, use_container_width=True)
+                else:
+                    st.info("No citation data available")
+
+            # Charts Row 2: Journal Distribution & Top Authors
+            chart_cols2 = st.columns(2)
+
+            with chart_cols2[0]:
+                if stats.top_journals:
+                    journal_fig = create_journal_distribution_chart(stats.top_journals)
+                    if journal_fig:
+                        st.plotly_chart(journal_fig, use_container_width=True)
+                else:
+                    st.info("No journal data available")
+
+            with chart_cols2[1]:
+                if stats.top_authors:
+                    author_fig = create_author_chart(stats.top_authors)
+                    if author_fig:
+                        st.plotly_chart(author_fig, use_container_width=True)
+                else:
+                    st.info("No author data available")
+
+            # Charts Row 3: Keywords
+            if stats.top_keywords:
+                st.markdown("#### Top Keywords")
+                keyword_fig = create_keyword_chart(stats.top_keywords)
+                if keyword_fig:
+                    st.plotly_chart(keyword_fig, use_container_width=True)
+
+            # Top Cited Papers Table
+            if stats.top_cited_papers:
+                st.markdown("#### Top Cited Papers")
+                top_cited_data = []
+                for i, paper in enumerate(stats.top_cited_papers[:10], 1):
+                    authors = paper.get('authors', [])
+                    if isinstance(authors, list):
+                        author_str = ', '.join(authors[:3])
+                        if len(authors) > 3:
+                            author_str += ' et al.'
+                    else:
+                        author_str = str(authors)
+
+                    top_cited_data.append({
+                        'Rank': i,
+                        'Title': paper.get('title', '')[:80] + ('...' if len(paper.get('title', '')) > 80 else ''),
+                        'Authors': author_str,
+                        'Year': paper.get('year', ''),
+                        'Citations': paper.get('citations', 0)
+                    })
+
+                import pandas as pd
+                top_cited_df = pd.DataFrame(top_cited_data)
+                st.dataframe(
+                    top_cited_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        "Rank": st.column_config.NumberColumn("Rank", width="small"),
+                        "Title": st.column_config.TextColumn("Paper Title", width="large"),
+                        "Authors": st.column_config.TextColumn("Authors", width="medium"),
+                        "Year": st.column_config.TextColumn("Year", width="small"),
+                        "Citations": st.column_config.NumberColumn("Citations", width="small"),
+                    }
+                )
+        else:
+            st.info("Run SLR analysis first to see bibliometric data.")
+
     # ========== DRAFTING PREVIEW ==========
     st.markdown("---")
     st.markdown("""
