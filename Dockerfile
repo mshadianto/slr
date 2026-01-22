@@ -1,5 +1,9 @@
+# Muezza AI Dockerfile - Updated 2026-01-22
 # Gunakan image Python yang ringan
 FROM python:3.11-slim
+
+# Cache bust
+ARG CACHEBUST=1
 
 # Set working directory di dalam container
 WORKDIR /app
