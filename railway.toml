@@ -1,7 +1,10 @@
 [build]
-builder = "nixpacks"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 numReplicas = 1
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5
+healthcheckPath = "/_stcore/health"
+healthcheckTimeout = 300
