@@ -33,6 +33,8 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import asyncio
+import nest_asyncio
+nest_asyncio.apply()  # Allow nested event loops for Streamlit compatibility
 import time
 import json
 import os

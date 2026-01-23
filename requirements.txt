@@ -14,3 +14,4 @@ sentence-transformers
 scholarly
 tenacity
 rapidfuzz
+nest_asyncio
