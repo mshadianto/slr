@@ -481,9 +481,9 @@ def main():
         # Action Buttons
         col1, col2 = st.columns(2)
         with col1:
-            run_button = st.button("🚀 Run", type="primary", use_container_width=True)
+            run_button = st.button("🚀 Run", type="primary", width="stretch")
         with col2:
-            reset_button = st.button("🔄 Reset", use_container_width=True)
+            reset_button = st.button("🔄 Reset", width="stretch")
         
         if reset_button:
             for key in list(st.session_state.keys()):
@@ -542,14 +542,14 @@ def main():
         # PRISMA Flowchart
         st.plotly_chart(
             render_prisma_flowchart(st.session_state.prisma_stats),
-            use_container_width=True
+            width="stretch"
         )
         
         # Quality Distribution
         if sum(st.session_state.quality_distribution.values()) > 0:
             st.plotly_chart(
                 render_quality_distribution(st.session_state.quality_distribution),
-                use_container_width=True
+                width="stretch"
             )
     
     # Run Pipeline
@@ -628,7 +628,7 @@ def main():
         df = pd.DataFrame(results_data)
         
         # Display dataframe
-        st.dataframe(df, use_container_width=True, height=400)
+        st.dataframe(df, width="stretch", height=400)
         
         # Export Options
         st.subheader("📤 Export Options")
@@ -641,7 +641,7 @@ def main():
                 data=csv_data,
                 file_name="biblioagent_synthesis.csv",
                 mime="text/csv",
-                use_container_width=True
+                width="stretch"
             )
         
         with export_cols[1]:
@@ -651,7 +651,7 @@ def main():
                 data=json_data,
                 file_name="biblioagent_synthesis.json",
                 mime="application/json",
-                use_container_width=True
+                width="stretch"
             )
         
         with export_cols[2]:
@@ -689,11 +689,11 @@ QUALITY DISTRIBUTION
                 data=prisma_report,
                 file_name="prisma_report.txt",
                 mime="text/plain",
-                use_container_width=True
+                width="stretch"
             )
         
         with export_cols[3]:
-            st.button("📧 Email Report", use_container_width=True, disabled=True, help="Coming soon")
+            st.button("📧 Email Report", width="stretch", disabled=True, help="Coming soon")
 
     # ============================================================================
     # ADDITIONAL TABS FOR DETAILED VIEWS

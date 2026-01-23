@@ -16,32 +16,6 @@ cp .env.example .env  # Configure API keys
 streamlit run app.py --server.port 8502
 ```
 
-## Railway Deployment
-
-Live URL: https://muezza-ai.up.railway.app/
-
-**Deployment files:**
-- `Procfile` - Start command for Railway
-- `railway.toml` - Nixpacks builder configuration
-- `packages.txt` - System dependencies for Streamlit Cloud (also works with Nixpacks)
-
-**Deploy to Railway:**
-1. Connect GitHub repo to Railway
-2. Railway auto-detects `Procfile` and uses Nixpacks builder
-3. Set environment variables in Railway dashboard (Settings → Variables)
-4. Generate domain in Settings → Networking
-
-**Start command** (in `Procfile`):
-```
-web: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
-```
-
-**Required Railway Variables:**
-- `ANTHROPIC_API_KEY`
-- `SCOPUS_API_KEY`
-- `SEMANTIC_SCHOLAR_API_KEY` (optional)
-- `UNPAYWALL_EMAIL` (optional)
-
 ## Required Environment Variables
 
 ```env
@@ -64,13 +38,14 @@ search_node → screening_node → acquisition_node → quality_node → END
                     narrative_generator → narrative_orchestrator → docx_export
 ```
 
-**State Management**: All agents share `SLRState` (TypedDict in `agents/state.py`) which tracks papers through each phase, PRISMA statistics, and agent status.
+**State Management**: All agents share `SLRState` (TypedDict in `agents/state.py`) which tracks papers through each phase, PRISMA statistics, and agent status via `AgentStatus` enum (PENDING/ACTIVE/COMPLETED/ERROR/PAUSED).
 
 **Core SLR Agents** (`agents/`):
 - `SearchAgent` - PICO parsing, Boolean query generation, Scopus search, RapidFuzz deduplication
 - `ScreeningAgent` - 4-phase screening (rule-based → semantic → Claude reasoning → human-in-loop)
 - `ScroungerAgent` - BiblioHunter integration for full-text acquisition
 - `QualityAgent` - JBI Critical Appraisal framework assessment
+- `BibliometricAgent` - Publication trends, journal distribution, citation analysis charts
 
 **Report Generation Agents** (`agents/`):
 - `NarrativeGenerator` - BAB IV (Results chapter) in formal Indonesian
@@ -95,7 +70,7 @@ hunter = BiblioHunter(s2_api_key="...", unpaywall_email="...")
 result = hunter.hunt("10.1038/nature12373")
 ```
 
-**Waterfall Order**: Semantic Scholar OA → Unpaywall → CORE → ArXiv → Virtual Full-Text
+**Waterfall Order**: Semantic Scholar OA → Unpaywall → DOAJ → CORE → ArXiv → Google Scholar → Virtual Full-Text
 
 **Virtual Full-Text** (when no PDF available): Synthesizes content from TL;DR, abstract, citation contexts (up to 15 snippets), related papers, and key references.
 
@@ -107,6 +82,10 @@ Each client handles its own rate limiting and error recovery:
 - `unpaywall.py` - Open access PDF discovery (100K req/day)
 - `core_api.py` - CORE aggregator (10 req/sec)
 - `arxiv_api.py` - Preprint server (1 req/3sec)
+- `doaj.py` - Directory of Open Access Journals
+- `google_scholar.py` - Google Scholar fallback
+- `query_translator.py` - Indonesian → English query translation with academic term mappings
+- `search_cache.py` - LRU cache with TTL, query normalization, thread-safe operations
 
 ### RAG Component (`rag/chromadb_store.py`)
 
@@ -146,7 +125,11 @@ async def acquire_papers(papers, progress_callback=None):
         progress_callback(f"Processing {len(papers)} papers...")
 ```
 
-**Pydantic settings**: Configuration in `config.py` uses `BaseSettings` with automatic `.env` loading.
+**Pydantic settings**: Configuration in `config.py` uses `BaseSettings` with automatic `.env` loading. Access via `from config import settings`.
+
+**Caching**: BiblioHunter uses 24-hour TTL in-memory cache. SearchCache provides LRU eviction with configurable TTL (default 1 hour).
+
+**Data classes**: `Paper` dataclass in `agents/state.py` carries all paper metadata through the pipeline. `PaperResult` in `api/biblio_hunter.py` for retrieval results.
 
 ## Troubleshooting
 
@@ -163,8 +146,10 @@ Quality scores categorized as: HIGH (≥80), MODERATE (60-79), LOW (40-59), CRIT
 
 Weighted criteria: Study Design (25%), Sample Size (20%), Control Group (15%), Randomization (15%), Blinding (10%), Statistical Methods (10%), Confidence Intervals (5%)
 
-## Theme Colors
+## Railway Deployment
 
-- Primary: #1E3A5F (dark blue)
-- Secondary: #2E8B57 (forest green)
-- Accent: #E67E22 (orange)
+Live URL: https://muezza-ai.up.railway.app/
+
+**Deployment files:** `Procfile`, `railway.toml`, `packages.txt`
+
+**Required Railway Variables:** `ANTHROPIC_API_KEY`, `SCOPUS_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY` (optional), `UNPAYWALL_EMAIL` (optional)

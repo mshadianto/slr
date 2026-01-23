@@ -1955,13 +1955,13 @@ def main():
             run_button = st.button(
                 "🚀 Start",
                 type="primary",
-                use_container_width=True,
+                width="stretch",
                 disabled=st.session_state.is_running
             )
         with col2:
             reset_button = st.button(
                 "🔄 Reset",
-                use_container_width=True
+                width="stretch"
             )
 
         if reset_button:
@@ -2026,7 +2026,7 @@ def main():
         # Sankey Diagram
         st.plotly_chart(
             render_prisma_sankey(stats),
-            use_container_width=True,
+            width="stretch",
             config={'displayModeBar': False}
         )
 
@@ -2045,7 +2045,7 @@ def main():
             st.markdown("<br>", unsafe_allow_html=True)
             st.plotly_chart(
                 render_quality_chart(st.session_state.quality_distribution),
-                use_container_width=True,
+                width="stretch",
                 config={'displayModeBar': False}
             )
 
@@ -2090,7 +2090,7 @@ def main():
         # Display table
         st.dataframe(
             df,
-            use_container_width=True,
+            width="stretch",
             height=400,
             column_config={
                 "Title": st.column_config.TextColumn("Paper Title", width="large"),
@@ -2115,7 +2115,7 @@ def main():
             )
 
         with verify_cols[1]:
-            verify_btn = st.button("🔬 Verify Citation", type="primary", use_container_width=True)
+            verify_btn = st.button("🔬 Verify Citation", type="primary", width="stretch")
 
         if verify_btn and selected_doi:
             paper_row = df[df['DOI'] == selected_doi].iloc[0]
@@ -2152,7 +2152,7 @@ def main():
                 data=csv_data,
                 file_name="muezza_audit_results.csv",
                 mime="text/csv",
-                use_container_width=True
+                width="stretch"
             )
 
         with export_cols[1]:
@@ -2162,14 +2162,14 @@ def main():
                 data=json_data,
                 file_name="muezza_audit_results.json",
                 mime="application/json",
-                use_container_width=True
+                width="stretch"
             )
 
         with export_cols[2]:
-            st.button("📊 Export PRISMA", use_container_width=True)
+            st.button("📊 Export PRISMA", width="stretch")
 
         with export_cols[3]:
-            st.button("📧 Share Report", use_container_width=True, disabled=True)
+            st.button("📧 Share Report", width="stretch", disabled=True)
 
     # ========== BIBLIOMETRIC ANALYSIS ==========
     if st.session_state.slr_state and st.session_state.slr_state.get("synthesis_ready"):
@@ -2222,7 +2222,7 @@ def main():
                 if stats.publication_years:
                     trend_fig = create_publication_trend_chart(stats.publication_years)
                     if trend_fig:
-                        st.plotly_chart(trend_fig, use_container_width=True)
+                        st.plotly_chart(trend_fig, width="stretch")
                 else:
                     st.info("No publication year data available")
 
@@ -2230,7 +2230,7 @@ def main():
                 if stats.citation_distribution:
                     cite_fig = create_citation_distribution_chart(stats.citation_distribution)
                     if cite_fig:
-                        st.plotly_chart(cite_fig, use_container_width=True)
+                        st.plotly_chart(cite_fig, width="stretch")
                 else:
                     st.info("No citation data available")
 
@@ -2241,7 +2241,7 @@ def main():
                 if stats.top_journals:
                     journal_fig = create_journal_distribution_chart(stats.top_journals)
                     if journal_fig:
-                        st.plotly_chart(journal_fig, use_container_width=True)
+                        st.plotly_chart(journal_fig, width="stretch")
                 else:
                     st.info("No journal data available")
 
@@ -2249,7 +2249,7 @@ def main():
                 if stats.top_authors:
                     author_fig = create_author_chart(stats.top_authors)
                     if author_fig:
-                        st.plotly_chart(author_fig, use_container_width=True)
+                        st.plotly_chart(author_fig, width="stretch")
                 else:
                     st.info("No author data available")
 
@@ -2258,7 +2258,7 @@ def main():
                 st.markdown("#### Top Keywords")
                 keyword_fig = create_keyword_chart(stats.top_keywords)
                 if keyword_fig:
-                    st.plotly_chart(keyword_fig, use_container_width=True)
+                    st.plotly_chart(keyword_fig, width="stretch")
 
             # Top Cited Papers Table
             if stats.top_cited_papers:
@@ -2285,7 +2285,7 @@ def main():
                 top_cited_df = pd.DataFrame(top_cited_data)
                 st.dataframe(
                     top_cited_df,
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                     column_config={
                         "Rank": st.column_config.NumberColumn("Rank", width="small"),
@@ -2336,7 +2336,7 @@ def main():
         generate_btn = st.button(
             "✨ Generate Full Report",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             disabled=st.session_state.report_generating
         )
 
@@ -2476,11 +2476,11 @@ def main():
                 data=md_report,
                 file_name="muezza_research_report.md",
                 mime="text/markdown",
-                use_container_width=True
+                width="stretch"
             )
 
         with download_cols[1]:
-            word_btn = st.button("📝 Word (Simple)", use_container_width=True)
+            word_btn = st.button("📝 Word (Simple)", width="stretch")
 
             if word_btn:
                 try:
@@ -2499,14 +2499,14 @@ def main():
                             data=word_data,
                             file_name="muezza_research_report.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            use_container_width=True
+                            width="stretch"
                         )
                         os.unlink(tmp_path)
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
 
         with download_cols[2]:
-            word_pro_btn = st.button("📑 Word (Pro)", use_container_width=True)
+            word_pro_btn = st.button("📑 Word (Pro)", width="stretch")
 
             if word_pro_btn:
                 try:
@@ -2549,7 +2549,7 @@ def main():
                         data=word_data,
                         file_name=f"Muezza_SLR_{st.session_state.researcher_name.replace(' ', '_')}.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=True
+                        width="stretch"
                     )
                     os.unlink(tmp_path)
 
@@ -2578,7 +2578,7 @@ def main():
                 data=json_report,
                 file_name="muezza_metadata.json",
                 mime="application/json",
-                use_container_width=True
+                width="stretch"
             )
 
     # ========== FOOTER ==========
