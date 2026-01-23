@@ -210,6 +210,24 @@ class SearchAgent:
         Returns:
             Boolean query string for Scopus API
         """
+        # Auto-translate Indonesian to English
+        try:
+            from api.query_translator import translate_research_query
+            translated_question, was_translated = translate_research_query(research_question)
+            if was_translated:
+                logger.info(f"Translated query: '{research_question}' -> '{translated_question}'")
+                research_question = translated_question
+
+            # Also translate inclusion criteria
+            if inclusion_criteria:
+                translated_criteria = []
+                for criterion in inclusion_criteria:
+                    trans_crit, _ = translate_research_query(criterion)
+                    translated_criteria.append(trans_crit)
+                inclusion_criteria = translated_criteria
+        except ImportError:
+            logger.warning("Query translator not available")
+
         # First try simple keyword extraction (more reliable)
         keywords = self._extract_keywords(research_question)
 

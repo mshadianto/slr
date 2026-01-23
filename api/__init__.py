@@ -20,6 +20,12 @@ from .search_cache import (
     SearchOptimizer,
     optimized_search,
 )
+from .query_translator import (
+    QueryTranslator,
+    get_translator,
+    translate_research_query,
+    detect_query_language,
+)
 
 __all__ = [
     "ScopusClient",
@@ -42,4 +48,8 @@ __all__ = [
     "ParallelSearcher",
     "SearchOptimizer",
     "optimized_search",
+    "QueryTranslator",
+    "get_translator",
+    "translate_research_query",
+    "detect_query_language",
 ]
