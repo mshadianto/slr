@@ -1,4 +1,4 @@
-# Muezza AI Dockerfile
+# Muezza AI Dockerfile - v2.1.0
 FROM python:3.11-slim
 
 WORKDIR /app
