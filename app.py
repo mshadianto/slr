@@ -1085,6 +1085,22 @@ def main():
         render_api_status_indicator("Claude AI", config["anthropic"])
         render_api_status_indicator("Unpaywall", config["unpaywall"])
 
+        # Cache Status
+        try:
+            from api.search_cache import get_search_cache
+            cache = get_search_cache()
+            cache_stats = cache.get_stats()
+            with st.expander("🚀 Cache Status", expanded=False):
+                st.markdown(f"""
+                <div style="font-size: 0.8rem; color: var(--slate-300);">
+                    <p>📊 Hit Rate: <strong style="color: var(--emerald-400);">{cache_stats['hit_rate']}</strong></p>
+                    <p>💾 Entries: {cache_stats['entries']}/{cache_stats['max_entries']}</p>
+                    <p>✅ Hits: {cache_stats['hits']} | ❌ Misses: {cache_stats['misses']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+        except:
+            pass
+
         st.markdown("---")
 
         # Research Question

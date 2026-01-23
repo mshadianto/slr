@@ -325,9 +325,15 @@ class SearchAgent:
             state["search_queries"].append(query)
             state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Generated query: {query[:100]}...")
 
-            # Execute search via Scopus API
+            # Execute search via Scopus API (with caching for speed)
             if self.scopus_client:
-                results = await self.scopus_client.search(query)
+                # Use cached_search for faster repeated queries
+                if hasattr(self.scopus_client, 'cached_search'):
+                    results = await self.scopus_client.cached_search(query)
+                    state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Using cached search...")
+                else:
+                    results = await self.scopus_client.search(query)
+
                 state["raw_papers"] = results
                 state["prisma_stats"]["identified"] = len(results)
 
@@ -336,7 +342,10 @@ class SearchAgent:
                     refined_query = self.refine_query(query, len(results))
                     if refined_query != query:
                         state["search_queries"].append(refined_query)
-                        results = await self.scopus_client.search(refined_query)
+                        if hasattr(self.scopus_client, 'cached_search'):
+                            results = await self.scopus_client.cached_search(refined_query)
+                        else:
+                            results = await self.scopus_client.search(refined_query)
                         state["raw_papers"] = results
                         state["prisma_stats"]["identified"] = len(results)
             else:

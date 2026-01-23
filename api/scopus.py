@@ -231,3 +231,52 @@ class ScopusClient:
     def get_request_count(self) -> int:
         """Get the number of API requests made."""
         return self._request_count
+
+    async def cached_search(
+        self,
+        query: str,
+        max_results: int = 200,
+        start_year: Optional[int] = None,
+        end_year: Optional[int] = None,
+        cache_ttl: int = 3600
+    ) -> List[Dict]:
+        """
+        Search with caching support.
+
+        Args:
+            query: Boolean search query
+            max_results: Maximum papers to return
+            start_year: Filter by start year
+            end_year: Filter by end year
+            cache_ttl: Cache TTL in seconds (default 1 hour)
+
+        Returns:
+            List of paper dictionaries
+        """
+        from .search_cache import get_search_cache
+
+        cache = get_search_cache()
+
+        # Build cache key params
+        cache_params = {
+            'max_results': max_results,
+            'start_year': start_year,
+            'end_year': end_year
+        }
+
+        # Try cache first
+        cached = cache.get(query, source="scopus", params=cache_params)
+        if cached is not None:
+            logger.info(f"[CACHE HIT] Scopus: {len(cached)} papers from cache")
+            return cached
+
+        # Execute actual search
+        logger.info(f"[CACHE MISS] Scopus: executing search...")
+        results = await self.search(query, max_results, start_year, end_year)
+
+        # Cache results
+        if results:
+            cache.set(query, results, source="scopus", params=cache_params, ttl=cache_ttl)
+            logger.info(f"[CACHED] Scopus: {len(results)} papers cached for {cache_ttl}s")
+
+        return results

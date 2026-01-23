@@ -12,6 +12,14 @@ from .semantic_scholar import SemanticScholarClient
 from .doaj import DOAJClient, search_doaj, get_doaj_pdf
 from .google_scholar import GoogleScholarClient, search_google_scholar
 from .biblio_hunter import BiblioHunter, PaperResult, hunt_paper, batch_hunt_papers
+from .search_cache import (
+    SearchCache,
+    get_search_cache,
+    cached_search,
+    ParallelSearcher,
+    SearchOptimizer,
+    optimized_search,
+)
 
 __all__ = [
     "ScopusClient",
@@ -28,4 +36,10 @@ __all__ = [
     "PaperResult",
     "hunt_paper",
     "batch_hunt_papers",
+    "SearchCache",
+    "get_search_cache",
+    "cached_search",
+    "ParallelSearcher",
+    "SearchOptimizer",
+    "optimized_search",
 ]
