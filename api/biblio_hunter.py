@@ -128,10 +128,13 @@ class BiblioHunter:
     PDF Sources (waterfall):
     1. Semantic Scholar Open Access
     2. Unpaywall
-    3. DOAJ (Directory of Open Access Journals)
-    4. CORE
-    5. ArXiv
-    6. Google Scholar (fallback)
+    3. OpenAlex (NEW - 250M+ works)
+    4. Crossref (NEW - metadata enrichment)
+    5. DOAJ (Directory of Open Access Journals)
+    6. PubMed Central (NEW - biomedical full-text)
+    7. CORE
+    8. ArXiv
+    9. Google Scholar (fallback)
 
     When no PDF available:
     - Generates Virtual Full-Text from abstract + citation contexts + TL;DR
@@ -142,7 +145,12 @@ class BiblioHunter:
         s2_api_key: str = None,
         unpaywall_email: str = None,
         core_api_key: str = None,
+        openalex_email: str = None,
+        ncbi_api_key: str = None,
         enable_doaj: bool = True,
+        enable_openalex: bool = True,
+        enable_crossref: bool = True,
+        enable_pubmed: bool = True,
         enable_google_scholar: bool = False,
         enable_cache: bool = True,
         cache_ttl_hours: int = 24,
@@ -155,7 +163,12 @@ class BiblioHunter:
             s2_api_key: Semantic Scholar API key (optional but recommended)
             unpaywall_email: Email for Unpaywall API (required for Unpaywall)
             core_api_key: CORE API key (optional)
+            openalex_email: Email for OpenAlex polite pool (optional)
+            ncbi_api_key: NCBI API key for PubMed (optional)
             enable_doaj: Enable DOAJ search (default True, no API key needed)
+            enable_openalex: Enable OpenAlex search (default True)
+            enable_crossref: Enable Crossref search (default True)
+            enable_pubmed: Enable PubMed/PMC search (default True)
             enable_google_scholar: Enable Google Scholar (default False, has strict rate limits)
             enable_cache: Whether to cache results
             cache_ttl_hours: Cache TTL in hours
@@ -164,7 +177,12 @@ class BiblioHunter:
         self.s2_api_key = s2_api_key
         self.unpaywall_email = unpaywall_email
         self.core_api_key = core_api_key
+        self.openalex_email = openalex_email
+        self.ncbi_api_key = ncbi_api_key
         self.enable_doaj = enable_doaj
+        self.enable_openalex = enable_openalex
+        self.enable_crossref = enable_crossref
+        self.enable_pubmed = enable_pubmed
         self.enable_google_scholar = enable_google_scholar
 
         self.s2_base_url = "https://api.semanticscholar.org/graph/v1"
@@ -188,6 +206,17 @@ class BiblioHunter:
             'pdf_found': 0,
             'virtual_fulltext_generated': 0,
             'not_found': 0,
+            'source_hits': {
+                'semantic_scholar': 0,
+                'unpaywall': 0,
+                'openalex': 0,
+                'crossref': 0,
+                'doaj': 0,
+                'pubmed': 0,
+                'core': 0,
+                'arxiv': 0,
+                'google_scholar': 0,
+            }
         }
 
     def _rate_limit(self, min_interval: float = 1.1):
@@ -463,7 +492,7 @@ class BiblioHunter:
         result: PaperResult,
         doi: str
     ) -> PaperResult:
-        """Try multiple sources to find PDF."""
+        """Try multiple sources to find PDF using enhanced waterfall strategy."""
 
         # 1. Try Unpaywall
         if self.unpaywall_email:
@@ -474,22 +503,63 @@ class BiblioHunter:
                 result.full_text_source = 'unpaywall'
                 result.retrieval_confidence = 1.0
                 self.stats['pdf_found'] += 1
+                self.stats['source_hits']['unpaywall'] += 1
                 logger.info(f"PDF found via Unpaywall: {doi}")
                 return result
 
-        # 2. Try DOAJ (guaranteed Open Access)
+        # 2. Try OpenAlex (250M+ works, free)
+        if self.enable_openalex:
+            pdf_url = self._try_openalex(doi)
+            if pdf_url:
+                result.pdf_url = pdf_url
+                result.pdf_source = 'openalex'
+                result.full_text_source = 'openalex'
+                result.retrieval_confidence = 1.0
+                self.stats['pdf_found'] += 1
+                self.stats['source_hits']['openalex'] += 1
+                logger.info(f"PDF found via OpenAlex: {doi}")
+                return result
+
+        # 3. Try Crossref (for link to publisher)
+        if self.enable_crossref:
+            pdf_url = self._try_crossref(doi)
+            if pdf_url:
+                result.pdf_url = pdf_url
+                result.pdf_source = 'crossref'
+                result.full_text_source = 'crossref'
+                result.retrieval_confidence = 0.9
+                self.stats['pdf_found'] += 1
+                self.stats['source_hits']['crossref'] += 1
+                logger.info(f"PDF found via Crossref: {doi}")
+                return result
+
+        # 4. Try DOAJ (guaranteed Open Access)
         if self.enable_doaj:
             pdf_url = self._try_doaj(doi, result.title)
             if pdf_url:
                 result.pdf_url = pdf_url
                 result.pdf_source = 'doaj'
                 result.full_text_source = 'doaj'
-                result.retrieval_confidence = 1.0  # DOAJ is guaranteed OA
+                result.retrieval_confidence = 1.0
                 self.stats['pdf_found'] += 1
+                self.stats['source_hits']['doaj'] += 1
                 logger.info(f"PDF found via DOAJ: {doi}")
                 return result
 
-        # 3. Try CORE
+        # 5. Try PubMed Central (biomedical full-text)
+        if self.enable_pubmed:
+            pdf_url = self._try_pubmed(doi)
+            if pdf_url:
+                result.pdf_url = pdf_url
+                result.pdf_source = 'pubmed'
+                result.full_text_source = 'pubmed_central'
+                result.retrieval_confidence = 1.0
+                self.stats['pdf_found'] += 1
+                self.stats['source_hits']['pubmed'] += 1
+                logger.info(f"PDF found via PubMed Central: {doi}")
+                return result
+
+        # 6. Try CORE
         if self.core_api_key:
             pdf_url = self._try_core(doi)
             if pdf_url:
@@ -498,10 +568,11 @@ class BiblioHunter:
                 result.full_text_source = 'core'
                 result.retrieval_confidence = 0.95
                 self.stats['pdf_found'] += 1
+                self.stats['source_hits']['core'] += 1
                 logger.info(f"PDF found via CORE: {doi}")
                 return result
 
-        # 4. Try ArXiv (check if paper has ArXiv version)
+        # 7. Try ArXiv (check if paper has ArXiv version)
         arxiv_url = self._try_arxiv_for_doi(doi, result.title)
         if arxiv_url:
             result.pdf_url = arxiv_url
@@ -509,10 +580,11 @@ class BiblioHunter:
             result.full_text_source = 'arxiv'
             result.retrieval_confidence = 0.9
             self.stats['pdf_found'] += 1
+            self.stats['source_hits']['arxiv'] += 1
             logger.info(f"PDF found via ArXiv: {doi}")
             return result
 
-        # 5. Try Google Scholar (fallback, has strict rate limits)
+        # 8. Try Google Scholar (fallback, has strict rate limits)
         if self.enable_google_scholar and result.title:
             pdf_url = self._try_google_scholar(result.title)
             if pdf_url:
@@ -521,10 +593,68 @@ class BiblioHunter:
                 result.full_text_source = 'google_scholar'
                 result.retrieval_confidence = 0.85
                 self.stats['pdf_found'] += 1
+                self.stats['source_hits']['google_scholar'] += 1
                 logger.info(f"PDF found via Google Scholar: {doi}")
                 return result
 
         return result
+
+    def _try_openalex(self, doi: str) -> Optional[str]:
+        """Try to get PDF from OpenAlex."""
+        try:
+            from api.openalex import OpenAlexClient
+
+            client = OpenAlexClient(email=self.openalex_email)
+            work = client.get_work_by_doi(doi)
+
+            if work and work.pdf_url:
+                return work.pdf_url
+
+        except ImportError:
+            logger.debug("OpenAlex client not available")
+        except Exception as e:
+            logger.debug(f"OpenAlex error for {doi}: {e}")
+
+        return None
+
+    def _try_crossref(self, doi: str) -> Optional[str]:
+        """Try to get PDF link from Crossref."""
+        try:
+            from api.crossref import CrossrefClient
+
+            client = CrossrefClient(mailto=self.unpaywall_email or "")
+            work = client.get_work_by_doi(doi)
+
+            if work and work.link:
+                # Check if link appears to be a PDF
+                link = work.link
+                if '.pdf' in link.lower() or 'pdf' in link.lower():
+                    return link
+
+        except ImportError:
+            logger.debug("Crossref client not available")
+        except Exception as e:
+            logger.debug(f"Crossref error for {doi}: {e}")
+
+        return None
+
+    def _try_pubmed(self, doi: str) -> Optional[str]:
+        """Try to get PDF from PubMed Central."""
+        try:
+            from api.pubmed import PubMedClient
+
+            client = PubMedClient(api_key=self.ncbi_api_key)
+            article = client.get_article_by_doi(doi)
+
+            if article and article.pmc_pdf_url:
+                return article.pmc_pdf_url
+
+        except ImportError:
+            logger.debug("PubMed client not available")
+        except Exception as e:
+            logger.debug(f"PubMed error for {doi}: {e}")
+
+        return None
 
     def _try_unpaywall(self, doi: str) -> Optional[str]:
         """Try to get PDF from Unpaywall."""

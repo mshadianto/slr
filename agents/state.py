@@ -157,6 +157,13 @@ class SLRState(TypedDict):
     # Agent status tracking
     agent_status: Dict[str, str]
 
+    # Citation Network Analysis (NEW)
+    citation_network: Dict[str, Any]  # Network graph data (nodes, edges)
+    citation_contexts_analysis: Dict[str, Dict]  # paper_id -> citation context analysis
+    network_metrics: Dict[str, float]  # Centrality, cluster metrics
+    key_papers: List[Dict]  # Most influential papers in network
+    research_clusters: Dict[int, List[str]]  # cluster_id -> paper_ids
+
     # Processing metadata
     processing_log: List[str]
     errors: List[str]
@@ -218,7 +225,15 @@ def create_initial_state(
             "screening": AgentStatus.PENDING.value,
             "acquisition": AgentStatus.PENDING.value,
             "quality": AgentStatus.PENDING.value,
+            "citation_network": AgentStatus.PENDING.value,
         },
+
+        # Citation Network Analysis
+        citation_network={},
+        citation_contexts_analysis={},
+        network_metrics={},
+        key_papers=[],
+        research_clusters={},
 
         # Metadata
         processing_log=[],

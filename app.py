@@ -1520,6 +1520,11 @@ def check_configuration() -> Dict[str, bool]:
         "unpaywall": bool(settings.unpaywall_email),
         "doaj": True,  # DOAJ is always available (free public API)
         "google_scholar": scholarly_available,  # Available if scholarly installed
+        # New expanded waterfall sources
+        "openalex": True,  # OpenAlex is always available (free, no API key required)
+        "crossref": True,  # Crossref is always available (free public API)
+        "pubmed": True,  # PubMed is always available (free, API key optional)
+        "pubmed_enhanced": bool(getattr(settings, 'ncbi_api_key', None)),  # Enhanced rate limits with key
     }
 
 
@@ -1884,13 +1889,22 @@ def main():
         # API Status Section
         st.markdown("### 🔌 API Status")
         config = check_configuration()
+
+        # Primary Sources
+        st.caption("Primary Sources")
         render_api_status_indicator("Scopus", config["scopus"])
         render_api_status_indicator("Semantic Scholar", config["semantic_scholar"])
-        render_api_status_indicator("DOAJ", config["doaj"])
-        render_api_status_indicator("Google Scholar", config["google_scholar"])
-        render_api_status_indicator("CORE", config.get("core", False))
         render_api_status_indicator("Claude AI", config["anthropic"])
+
+        # Expanded Waterfall Sources
+        st.caption("Waterfall Sources")
         render_api_status_indicator("Unpaywall", config["unpaywall"])
+        render_api_status_indicator("OpenAlex", config["openalex"])
+        render_api_status_indicator("Crossref", config["crossref"])
+        render_api_status_indicator("PubMed/PMC", config["pubmed"])
+        render_api_status_indicator("DOAJ", config["doaj"])
+        render_api_status_indicator("CORE", config.get("core", False))
+        render_api_status_indicator("Google Scholar", config["google_scholar"])
 
         # Cache Status
         try:
@@ -2299,6 +2313,153 @@ def main():
                 )
         else:
             st.info("Run SLR analysis first to see bibliometric data.")
+
+    # ========== CITATION NETWORK EXPLORER ==========
+    if st.session_state.slr_state and st.session_state.slr_state.get("synthesis_ready"):
+        st.markdown("---")
+        st.markdown("""
+        <div class="section-header">
+            <div class="icon">🕸️</div>
+            <h2>Citation Network Explorer</h2>
+        </div>
+        """, unsafe_allow_html=True)
+
+        papers_for_network = st.session_state.slr_state.get("synthesis_ready", [])
+
+        if papers_for_network:
+            try:
+                from agents.citation_network_agent import CitationNetworkAgent, NETWORKX_AVAILABLE
+                from agents.citation_context_analyzer import CitationContextAnalyzer
+
+                if not NETWORKX_AVAILABLE:
+                    st.warning("NetworkX library not installed. Run: pip install networkx")
+                else:
+                    # Network Analysis Controls
+                    net_cols = st.columns([1, 1, 2])
+                    with net_cols[0]:
+                        max_depth = st.slider("Network Depth", 1, 3, 1, help="How many citation layers to explore")
+                    with net_cols[1]:
+                        max_papers = st.slider("Max Papers", 20, 100, 50, help="Maximum papers in network")
+
+                    if st.button("Build Citation Network", type="secondary"):
+                        with st.spinner("Building citation network..."):
+                            agent = CitationNetworkAgent(
+                                s2_api_key=settings.semantic_scholar_api_key,
+                                max_depth=max_depth,
+                                max_papers=max_papers
+                            )
+
+                            network = agent.build_network(papers_for_network)
+
+                            if network and network.nodes:
+                                # Store in session state
+                                st.session_state.citation_network = network.to_dict()
+
+                                # Display metrics
+                                metric_cols = st.columns(4)
+                                with metric_cols[0]:
+                                    st.metric("Papers in Network", len(network.nodes))
+                                with metric_cols[1]:
+                                    st.metric("Citation Links", len(network.edges))
+                                with metric_cols[2]:
+                                    st.metric("Research Clusters", len(network.clusters))
+                                with metric_cols[3]:
+                                    seed_count = sum(1 for n in network.nodes if n.is_seed)
+                                    st.metric("Seed Papers", seed_count)
+
+                                st.markdown("---")
+
+                                # Network Visualization
+                                st.markdown("#### Network Visualization")
+                                try:
+                                    plotly_data = network.to_plotly_data()
+                                    if plotly_data.get('node_x'):
+                                        import plotly.graph_objects as go
+
+                                        # Create edge trace
+                                        edge_trace = go.Scatter(
+                                            x=plotly_data['edge_x'],
+                                            y=plotly_data['edge_y'],
+                                            mode='lines',
+                                            line=dict(width=0.5, color='#888'),
+                                            hoverinfo='none'
+                                        )
+
+                                        # Create node trace
+                                        node_trace = go.Scatter(
+                                            x=plotly_data['node_x'],
+                                            y=plotly_data['node_y'],
+                                            mode='markers+text',
+                                            hovertext=plotly_data['node_text'],
+                                            hoverinfo='text',
+                                            marker=dict(
+                                                size=plotly_data['node_size'],
+                                                color=plotly_data['node_color'],
+                                                colorscale='Viridis',
+                                                line_width=2
+                                            )
+                                        )
+
+                                        fig = go.Figure(
+                                            data=[edge_trace, node_trace],
+                                            layout=go.Layout(
+                                                title='Citation Network Graph',
+                                                titlefont_size=16,
+                                                showlegend=False,
+                                                hovermode='closest',
+                                                margin=dict(b=20, l=5, r=5, t=40),
+                                                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                                                height=500
+                                            )
+                                        )
+                                        st.plotly_chart(fig, use_container_width=True)
+                                except Exception as e:
+                                    st.warning(f"Could not render network visualization: {e}")
+
+                                # Key Papers Table
+                                st.markdown("#### Key Papers by Centrality")
+                                key_papers = agent.get_key_papers(10)
+                                if key_papers:
+                                    key_data = []
+                                    for i, paper in enumerate(key_papers, 1):
+                                        key_data.append({
+                                            'Rank': i,
+                                            'Title': paper.title[:60] + ('...' if len(paper.title) > 60 else ''),
+                                            'Year': paper.year,
+                                            'Citations': paper.citations,
+                                            'Centrality': f"{paper.centrality_score:.4f}",
+                                            'Cluster': paper.cluster_id
+                                        })
+                                    st.dataframe(pd.DataFrame(key_data), hide_index=True)
+
+                                # Cluster Summary
+                                st.markdown("#### Research Clusters")
+                                cluster_summary = agent.get_cluster_summary()
+                                if cluster_summary:
+                                    cluster_cols = st.columns(min(len(cluster_summary), 4))
+                                    for i, (cluster_id, summary) in enumerate(cluster_summary.items()):
+                                        with cluster_cols[i % len(cluster_cols)]:
+                                            st.markdown(f"**Cluster {cluster_id}**")
+                                            st.caption(f"{summary['paper_count']} papers")
+                                            st.caption(f"Years: {summary['year_range'][0]}-{summary['year_range'][1]}")
+                                            if summary['top_papers']:
+                                                st.caption(f"Top: {summary['top_papers'][0][1][:30]}...")
+
+                                st.success("Citation network built successfully!")
+                            else:
+                                st.warning("Could not build network - no related papers found")
+
+                    # Display existing network if available
+                    if hasattr(st.session_state, 'citation_network') and st.session_state.citation_network:
+                        st.info(f"Network cached: {st.session_state.citation_network.get('node_count', 0)} papers, {st.session_state.citation_network.get('edge_count', 0)} links")
+
+            except ImportError as e:
+                st.warning(f"Citation network features require additional libraries: {e}")
+            except Exception as e:
+                st.error(f"Error loading citation network: {e}")
+        else:
+            st.info("Run SLR analysis first to build citation network.")
 
     # ========== DRAFTING PREVIEW ==========
     st.markdown("---")

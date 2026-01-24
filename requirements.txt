@@ -15,3 +15,8 @@ scholarly
 tenacity
 rapidfuzz
 nest_asyncio
+# Citation Network & PDF Processing
+networkx>=3.0
+pyvis
+pymupdf
+pdfplumber

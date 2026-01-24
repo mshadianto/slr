@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     semantic_scholar_api_key: Optional[str] = Field(default=None, env="SEMANTIC_SCHOLAR_API_KEY")
     core_api_key: Optional[str] = Field(default=None, env="CORE_API_KEY")
 
+    # New API settings for expanded waterfall
+    openalex_email: str = Field(default="", env="OPENALEX_EMAIL")
+    ncbi_api_key: Optional[str] = Field(default=None, env="NCBI_API_KEY")
+
     # ChromaDB
     chroma_persist_dir: str = Field(default="./data/chroma_db", env="CHROMA_PERSIST_DIR")
 
@@ -43,6 +47,9 @@ class Settings(BaseSettings):
     core_base_url: str = "https://api.core.ac.uk/v3"
     arxiv_base_url: str = "http://export.arxiv.org/api/query"
     semantic_scholar_base_url: str = "https://api.semanticscholar.org/graph/v1"
+    openalex_base_url: str = "https://api.openalex.org"
+    crossref_base_url: str = "https://api.crossref.org"
+    pubmed_base_url: str = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 
     class Config:
         env_file = ".env"
