@@ -6,7 +6,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-green.svg)](https://github.com/langchain-ai/langgraph)
-[![Version](https://img.shields.io/badge/version-2.1.0-gold.svg)](https://github.com/mshadianto/slr)
+[![Version](https://img.shields.io/badge/version-2.2.0-gold.svg)](https://github.com/mshadianto/slr)
 
 **Muezza AI** automates the systematic literature review (SLR) process using a multi-agent architecture powered by LangGraph. It implements PRISMA 2020 guidelines with intelligent paper retrieval, screening, quality assessment, and **automated academic writing in formal Indonesian**.
 
@@ -26,7 +26,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  🐱 Muezza AI v2.1.0                                                        │
+│  🐱 Muezza AI v2.2.0                                                        │
 │  Faithful Research Companion — Intelligent SLR Automation System            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐                           │
@@ -61,11 +61,16 @@
 
 ### BiblioHunter - Intelligent Paper Retrieval
 - **Multi-identifier support** - DOI, ArXiv ID, PMID, Semantic Scholar ID, Title search
-- **Waterfall PDF retrieval** - Semantic Scholar → Unpaywall → CORE → ArXiv
-- **Virtual Full-Text** - TL;DR + Abstract + Citation Contexts + Related Papers
+- **Waterfall PDF retrieval** - 10 sources: Semantic Scholar → Unpaywall → OpenAlex → Crossref → DOAJ → PubMed Central → CORE → ArXiv → Google Scholar → Virtual Full-Text
+- **Virtual Full-Text** - TL;DR + Abstract + Citation Contexts + Related Papers (fallback for paywalled papers)
 - **In-memory caching** - 9000x+ speedup on repeated requests
 - **Parallel batch processing** - Configurable workers with progress callbacks
 - **Quality scoring** - 0-1 score based on confidence and content completeness
+
+### Citation Analysis
+- **Citation Network Agent** - Connected Papers-style visualization, PageRank centrality, cluster detection
+- **Citation Context Analyzer** - Scite-style classification (Supporting/Contrasting/Mentioning)
+- **Bibliometric Agent** - Publication trends, journal distribution, citation analysis charts
 
 ### Premium UI/UX
 - **Emerald Green, Gold, Dark Slate Gray** color palette
@@ -152,14 +157,16 @@ cp .env.example .env
 ```env
 # Required
 ANTHROPIC_API_KEY=sk-ant-...
-
-# Recommended
 SCOPUS_API_KEY=your_scopus_key
+
+# Recommended (higher rate limits)
 SEMANTIC_SCHOLAR_API_KEY=your_s2_key
+UNPAYWALL_EMAIL=your@email.com
 
 # Optional (enhances PDF retrieval)
-UNPAYWALL_EMAIL=your@email.com
 CORE_API_KEY=your_core_key
+OPENALEX_EMAIL=your@email.com
+NCBI_API_KEY=your_ncbi_key
 ```
 
 ### Run
@@ -209,13 +216,14 @@ Open http://localhost:8502 in your browser.
 - 📅 **Publication Period** - Date range filter
 
 ### Agent Status Monitor
-Four agent cards showing real-time status:
+Five agent cards showing real-time status:
 | Agent | Role | Status |
 |-------|------|--------|
 | 🔍 Search Strategist | Boolean query & database search | Pending/Running/Completed |
 | 🔬 Screening Specialist | Title/Abstract AI screening | Pending/Running/Completed |
 | 📥 Waterfall Retrieval | Multi-source full-text fetch | Pending/Running/Completed |
 | ⚖️ Quality Evaluator | JBI critical appraisal | Pending/Running/Completed |
+| 🕸️ Citation Network | Network analysis & clustering | Pending/Running/Completed |
 
 ### PRISMA 2020 Flow
 - Interactive Sankey diagram
@@ -318,13 +326,15 @@ Muezza-AI/
 ├── README.md                     # This file
 │
 ├── agents/                       # Multi-agent system
-│   ├── __init__.py
 │   ├── state.py                  # LangGraph state definitions
 │   ├── orchestrator.py           # Workflow orchestration
 │   ├── search_agent.py           # Scopus search & query generation
 │   ├── screening_agent.py        # Title/abstract screening
 │   ├── scrounger_agent.py        # Full-text acquisition (BiblioHunter)
 │   ├── quality_agent.py          # JBI quality assessment
+│   ├── bibliometric_agent.py     # Publication trends & charts
+│   ├── citation_network_agent.py # Network visualization & centrality
+│   ├── citation_context_analyzer.py # Citation classification
 │   ├── narrative_generator.py    # BAB IV generation (Indonesian)
 │   ├── narrative_orchestrator.py # Full 5-chapter report
 │   ├── citation_stitcher.py      # Auto citation matching
@@ -333,12 +343,20 @@ Muezza-AI/
 │   └── docx_generator.py         # Professional Word export
 │
 ├── api/                          # External API clients
-│   ├── biblio_hunter.py          # Enhanced paper retrieval
+│   ├── biblio_hunter.py          # Waterfall paper retrieval engine
 │   ├── scopus.py                 # Scopus API client
+│   ├── semantic_scholar.py       # Semantic Scholar client
 │   ├── unpaywall.py              # Unpaywall API client
+│   ├── openalex.py               # OpenAlex API client
+│   ├── crossref.py               # Crossref API client
+│   ├── pubmed.py                 # PubMed/NCBI client
 │   ├── core_api.py               # CORE API client
 │   ├── arxiv_api.py              # ArXiv API client
-│   └── semantic_scholar.py       # Semantic Scholar client
+│   ├── doaj.py                   # DOAJ client
+│   ├── google_scholar.py         # Google Scholar fallback
+│   ├── pdf_processor.py          # PDF extraction (PyMuPDF, pdfplumber)
+│   ├── query_translator.py       # Indonesian → English translation
+│   └── search_cache.py           # LRU cache with TTL
 │
 └── rag/                          # RAG components
     └── chromadb_store.py         # Vector store for semantic search
@@ -351,12 +369,13 @@ Muezza-AI/
 | Service | Required | Free Tier | Get Key |
 |---------|----------|-----------|---------|
 | Anthropic | Yes | No | [console.anthropic.com](https://console.anthropic.com) |
-| Scopus | Yes* | Yes (limited) | [dev.elsevier.com](https://dev.elsevier.com) |
+| Scopus | Yes | Yes (limited) | [dev.elsevier.com](https://dev.elsevier.com) |
 | Semantic Scholar | No | Yes (100 req/5min) | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) |
-| Unpaywall | No | Yes | Email only |
-| CORE | No | Yes (limited) | [core.ac.uk/services/api](https://core.ac.uk/services/api) |
-
-*Scopus required for comprehensive literature search
+| Unpaywall | No | Yes (100K/day) | Email only |
+| OpenAlex | No | Yes (100K/day) | No key needed (email optional) |
+| Crossref | No | Yes (50 req/sec) | No key needed |
+| PubMed/NCBI | No | Yes (3-10 req/sec) | [ncbi.nlm.nih.gov/account](https://www.ncbi.nlm.nih.gov/account/) |
+| CORE | No | Yes (10 req/sec) | [core.ac.uk/services/api](https://core.ac.uk/services/api) |
 
 ---
 
@@ -387,6 +406,7 @@ Muezza-AI/
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.2.0 | 2026-01-24 | Expanded waterfall (OpenAlex, Crossref, PubMed), Citation Network & Context Analysis |
 | 2.1.0 | 2026-01-22 | Add developer info, dynamic versioning |
 | 2.0.0 | 2026-01-22 | Complete UI redesign as Muezza AI |
 | 1.5.0 | 2026-01-21 | Add DocxGenerator, Expert Features |
@@ -412,12 +432,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
+- [Anthropic Claude](https://www.anthropic.com/) - LLM for screening, synthesis, and narrative generation
+- [LangGraph](https://github.com/langchain-ai/langgraph) - Multi-agent orchestration
 - [Semantic Scholar](https://www.semanticscholar.org/) - Paper metadata and citation data
+- [OpenAlex](https://openalex.org/) - Open catalog of scholarly works
+- [Crossref](https://www.crossref.org/) - DOI metadata and publisher links
+- [PubMed/NCBI](https://pubmed.ncbi.nlm.nih.gov/) - Biomedical literature database
 - [Unpaywall](https://unpaywall.org/) - Open access PDF discovery
 - [CORE](https://core.ac.uk/) - Open access aggregator
 - [ArXiv](https://arxiv.org/) - Preprint server
-- [Anthropic Claude](https://www.anthropic.com/) - LLM for screening, synthesis, and narrative generation
-- [LangGraph](https://github.com/langchain-ai/langgraph) - Multi-agent orchestration
 
 ---
 
@@ -431,7 +454,7 @@ If you use Muezza AI in your research, please cite:
   title = {Muezza AI: Faithful Research Companion for Automated Systematic Literature Reviews},
   year = {2026},
   url = {https://github.com/mshadianto/slr},
-  version = {2.1.0}
+  version = {2.2.0}
 }
 ```
 

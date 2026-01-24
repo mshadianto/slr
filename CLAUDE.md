@@ -23,7 +23,7 @@ docker run -p 8501:8501 -e ANTHROPIC_API_KEY=sk-ant-... muezza-ai
 
 ## Required Environment Variables
 
-Create `.env` file with:
+Create `.env` file (copy from `.env.example`):
 ```env
 ANTHROPIC_API_KEY=sk-ant-...          # Required for screening/quality/narrative
 SCOPUS_API_KEY=your_scopus_key        # Required for Scopus search
@@ -54,8 +54,8 @@ search_node → screening_node → acquisition_node → quality_node → END
 - `ScroungerAgent` - BiblioHunter integration for full-text acquisition
 - `QualityAgent` - JBI Critical Appraisal framework assessment
 - `BibliometricAgent` - Publication trends, journal distribution, citation analysis charts
-- `CitationNetworkAgent` - **NEW** Connected Papers-style network visualization, PageRank centrality, cluster detection
-- `CitationContextAnalyzer` - **NEW** Scite-style citation classification (Supporting/Contrasting/Mentioning)
+- `CitationNetworkAgent` - Connected Papers-style network visualization, PageRank centrality, cluster detection
+- `CitationContextAnalyzer` - Scite-style citation classification (Supporting/Contrasting/Mentioning)
 
 **Report Generation Agents** (`agents/`):
 - `NarrativeGenerator` - BAB IV (Results chapter) in formal Indonesian
@@ -72,27 +72,14 @@ Core paper retrieval engine with waterfall PDF strategy:
 ```python
 from api.biblio_hunter import BiblioHunter, hunt_paper
 
-# Quick usage
+# Quick usage - supports DOI, ArXiv ID, PMID, title search
 paper = hunt_paper("10.1038/nature12373")
-
-# Multi-identifier support: DOI, ArXiv ID, PMID, title search
-hunter = BiblioHunter(s2_api_key="...", unpaywall_email="...")
-result = hunter.hunt("10.1038/nature12373")
 ```
 
-**Waterfall Order** (9 sources):
-1. Semantic Scholar OA
-2. Unpaywall
-3. **OpenAlex** (250M+ works, free)
-4. **Crossref** (publisher links)
-5. DOAJ
-6. **PubMed Central** (biomedical full-text)
-7. CORE
-8. ArXiv
-9. Google Scholar
-10. Virtual Full-Text (fallback)
+**Waterfall Order** (10 sources + fallback):
+1. Semantic Scholar OA → 2. Unpaywall → 3. OpenAlex → 4. Crossref → 5. DOAJ → 6. PubMed Central → 7. CORE → 8. ArXiv → 9. Google Scholar → 10. Virtual Full-Text (fallback)
 
-**Virtual Full-Text** (when no PDF available): Synthesizes content from TL;DR, abstract, citation contexts (up to 15 snippets), related papers, and key references.
+**Virtual Full-Text**: When no PDF is available, synthesizes content from TL;DR, abstract, citation contexts (up to 15 snippets), related papers, and key references.
 
 ### External API Clients (`api/`)
 
@@ -100,14 +87,14 @@ Each client handles its own rate limiting and error recovery:
 - `scopus.py` - Elsevier Scopus Search API (5000 req/week, 9/sec)
 - `semantic_scholar.py` - Paper metadata and citations (100 req/5min without key)
 - `unpaywall.py` - Open access PDF discovery (100K req/day)
-- `openalex.py` - **NEW** OpenAlex API (250M+ works, 100K req/day, free)
-- `crossref.py` - **NEW** Crossref API (140M+ works, 50 req/sec)
-- `pubmed.py` - **NEW** PubMed/NCBI E-utilities (35M+ biomedical, 3-10 req/sec)
+- `openalex.py` - OpenAlex API (250M+ works, 100K req/day, free)
+- `crossref.py` - Crossref API (140M+ works, 50 req/sec)
+- `pubmed.py` - PubMed/NCBI E-utilities (35M+ biomedical, 3-10 req/sec)
 - `core_api.py` - CORE aggregator (10 req/sec)
 - `arxiv_api.py` - Preprint server (1 req/3sec)
 - `doaj.py` - Directory of Open Access Journals
 - `google_scholar.py` - Google Scholar fallback
-- `pdf_processor.py` - **NEW** Multi-backend PDF extraction (PyMuPDF, pdfplumber)
+- `pdf_processor.py` - Multi-backend PDF extraction (PyMuPDF, pdfplumber)
 - `query_translator.py` - Indonesian → English query translation with academic term mappings
 - `search_cache.py` - LRU cache with TTL, query normalization, thread-safe operations
 
@@ -118,61 +105,16 @@ ChromaDB vector store using `all-MiniLM-L6-v2` embeddings for semantic search du
 ## Testing Individual Components
 
 ```bash
-# Test BiblioHunter paper retrieval
+# Test BiblioHunter
 python -c "from api.biblio_hunter import hunt_paper; print(hunt_paper('10.1038/nature12373'))"
 
-# Test new API clients
+# Test API clients
 python -c "from api.openalex import OpenAlexClient; print(OpenAlexClient().search('machine learning'))"
 python -c "from api.crossref import CrossrefClient; print(CrossrefClient().get_work_by_doi('10.1038/nature12373'))"
 python -c "from api.pubmed import PubMedClient; print(PubMedClient().search('COVID-19 treatment', limit=5))"
 
-# Test citation network
-python -c "
-from agents.citation_network_agent import CitationNetworkAgent
-agent = CitationNetworkAgent(max_depth=1, max_papers=20)
-network = agent.build_network([{'doi': '10.1038/nature12373', 'title': 'Test', 'paper_id': 'test'}])
-print(f'Nodes: {len(network.nodes)}, Edges: {len(network.edges)}')
-"
-
-# Test citation context analyzer
-python -c "
-from agents.citation_context_analyzer import CitationContextAnalyzer
-analyzer = CitationContextAnalyzer()
-result = analyzer.classify_context('Our results support the findings of Smith et al.')
-print(result)
-"
-
-# Test async SLR acquisition
-python -c "
-import asyncio
-from agents.scrounger_agent import acquire_papers
-papers = [{'doi': '10.1038/nature12373'}]
-results = asyncio.run(acquire_papers(papers))
-print(results)
-"
-```
-
-**Import patterns for agents**:
-```python
-# Individual agent imports
-from agents.narrative_orchestrator import NarrativeOrchestrator
-from agents.citation_stitcher import CitationAutoStitcher
-from agents.forensic_audit_agent import ForensicAuditAgent
-from agents.docx_generator import DocxGenerator
-
-# NEW: Citation analysis agents
-from agents.citation_network_agent import CitationNetworkAgent, build_citation_network
-from agents.citation_context_analyzer import CitationContextAnalyzer, analyze_citation_contexts
-
-# NEW: API clients
-from api.openalex import OpenAlexClient, search_openalex
-from api.crossref import CrossrefClient, search_crossref
-from api.pubmed import PubMedClient, search_pubmed
-from api.pdf_processor import PDFProcessor, process_pdf
-
-# State and orchestration
-from agents.state import SLRState, Paper, PRISMAStats, AgentStatus
-from agents.orchestrator import SLROrchestrator
+# Test async acquisition
+python -c "import asyncio; from agents.scrounger_agent import acquire_papers; print(asyncio.run(acquire_papers([{'doi': '10.1038/nature12373'}])))"
 ```
 
 ## Key Patterns
@@ -194,9 +136,17 @@ async def acquire_papers(papers, progress_callback=None):
 
 **Orchestrator usage**:
 ```python
+from agents.orchestrator import SLROrchestrator
+from agents.state import create_initial_state
+
 orchestrator = SLROrchestrator(
     progress_callback=lambda phase, percent, msg: print(f"{phase}: {percent}% - {msg}"),
     enable_checkpointing=False  # Disable due to numpy serialization issues
+)
+initial_state = create_initial_state(
+    research_question="...",
+    inclusion_criteria=["..."],
+    exclusion_criteria=["..."]
 )
 result = await orchestrator.run(initial_state)
 ```
@@ -212,50 +162,13 @@ result = await orchestrator.run(initial_state)
 
 ## Quality Assessment (JBI Framework)
 
-Quality scores categorized as: HIGH (≥80), MODERATE (60-79), LOW (40-59), CRITICAL (<40)
+Quality scores: HIGH (≥80), MODERATE (60-79), LOW (40-59), CRITICAL (<40)
 
 Weighted criteria: Study Design (25%), Sample Size (20%), Control Group (15%), Randomization (15%), Blinding (10%), Statistical Methods (10%), Confidence Intervals (5%)
 
-## Railway Deployment
+## Deployment
 
-Live URL: https://muezza-ai.up.railway.app/
-
-**Deployment files:** `Procfile`, `railway.toml`, `packages.txt`
-
-**Required Railway Variables:** `ANTHROPIC_API_KEY`, `SCOPUS_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY` (optional), `UNPAYWALL_EMAIL` (optional)
-
-## Related AI Research Tools
-
-Reference: [Awesome AI Research Tools](https://github.com/Harrypatria/Awesome-AI-Research-Tools-)
-
-### Already Integrated
-- **Semantic Scholar** (semanticscholar.org) - 227M+ papers, used in BiblioHunter waterfall
-- **Unpaywall** (unpaywall.org) - OA PDF discovery, 100K req/day
-- **OpenAlex** (openalex.org) - **NEW** 250M+ works, free API, no key required
-- **Crossref** (crossref.org) - **NEW** 140M+ works, DOI metadata, 50 req/sec
-- **PubMed/NCBI** (pubmed.gov) - **NEW** 35M+ biomedical citations, PMC full-text
-- **CORE** (core.ac.uk) - Academic aggregator, 10 req/sec
-- **ArXiv** (arxiv.org) - Preprint server, 1 req/3sec
-- **Scopus** (scopus.com) - Primary search database
-- **DOAJ** (doaj.org) - Directory of Open Access Journals
-
-### Similar SLR Tools (Competitive Landscape)
-| Tool | Focus | Key Difference from Muezza AI |
-|------|-------|------------------------------|
-| **ASReview** (asreview.nl) | Active learning screening | Open-source, no full-text acquisition |
-| **Rayyan** (rayyan.ai) | Collaborative screening | No auto-narrative generation |
-| **Elicit** (elicit.com) | Literature review automation | 125M papers, no Indonesian output |
-| **Covidence** | PRISMA compliance | Premium, no LLM integration |
-
-### Potential Integrations (PDF Processing)
-Open-source tools that could enhance BiblioHunter's PDF extraction:
-- **MinerU** - Multimodal PDF parsing to Markdown/JSON (1.2B params)
-- **Nougat** (Meta AI) - Scientific PDF to Markdown with formula support
-- **Marker** - High-accuracy PDF to Markdown/JSON/HTML
-- **Docling** (IBM) - Multi-format to structured data
-
-### Autonomous Research Agents (Emerging)
-For reference on future AI-driven research systems:
-- **The AI Scientist** - Full research cycle: hypothesis → experiment → paper
-- **AI-Researcher** (HKUDS) - Pipeline from review to publication
-- **Agent Laboratory** - Multi-agent with cumulative discovery
+**Railway** (Live: https://muezza-ai.up.railway.app/):
+- Deployment files: `Procfile`, `railway.toml`, `packages.txt`
+- Required variables: `ANTHROPIC_API_KEY`, `SCOPUS_API_KEY`
+- Optional: `SEMANTIC_SCHOLAR_API_KEY`, `UNPAYWALL_EMAIL`
