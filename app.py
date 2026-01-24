@@ -14,11 +14,11 @@ import streamlit as st
 # ============================================================================
 # APPLICATION METADATA
 # ============================================================================
-__version__ = "2.1.0"
+__version__ = "2.2.0"
 __author__ = "MS Hadianto"
 __app_name__ = "Muezza AI"
 __tagline__ = "Faithful Research Companion"
-__release_date__ = "2026-01-22"
+__release_date__ = "2026-01-24"
 
 APP_INFO = {
     "name": __app_name__,
@@ -34,7 +34,10 @@ import plotly.express as px
 import pandas as pd
 import asyncio
 import nest_asyncio
-nest_asyncio.apply()  # Allow nested event loops for Streamlit compatibility
+try:
+    nest_asyncio.apply()  # Allow nested event loops for Streamlit compatibility
+except ValueError:
+    pass  # uvloop doesn't need patching and is incompatible with nest_asyncio
 import time
 import json
 import os
