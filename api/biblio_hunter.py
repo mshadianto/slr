@@ -6,14 +6,16 @@ and intelligent Virtual Full-Text synthesis.
 
 Features:
 - Multi-identifier support (DOI, ArXiv, PMID, Semantic Scholar ID)
-- Waterfall PDF retrieval (S2 → Unpaywall → CORE → ArXiv)
+- Parallel waterfall PDF retrieval for speed
 - Enhanced Virtual Full-Text with TL;DR, references, related papers
 - In-memory caching to reduce API calls
 - Parallel batch processing with progress callbacks
 - PDF download capability
 - Title-based search fallback
+- Async support with connection pooling
 """
 
+import asyncio
 import requests
 import time
 import logging
@@ -503,9 +505,16 @@ class BiblioHunter:
         result: PaperResult,
         doi: str
     ) -> PaperResult:
-        """Try multiple sources to find PDF using enhanced waterfall strategy."""
+        """
+        Try multiple sources to find PDF using parallel waterfall strategy.
 
-        # 1. Try ScienceDirect (Elsevier full-text)
+        Phase 1 (Priority): ScienceDirect (Elsevier institutional access)
+        Phase 2 (Parallel Fast): Unpaywall, OpenAlex, DOAJ (run simultaneously)
+        Phase 3 (Parallel Slow): Crossref, PubMed, CORE
+        Phase 4 (Fallback): ArXiv, Google Scholar
+        """
+
+        # Phase 1: Try ScienceDirect first (often has best quality full-text)
         if self.enable_sciencedirect and self.scopus_api_key:
             sd_result = self._try_sciencedirect(doi)
             if sd_result:
@@ -527,85 +536,39 @@ class BiblioHunter:
                     logger.info(f"PDF found via ScienceDirect: {doi}")
                     return result
 
-        # 2. Try Unpaywall
-        if self.unpaywall_email:
-            pdf_url = self._try_unpaywall(doi)
-            if pdf_url:
-                result.pdf_url = pdf_url
-                result.pdf_source = 'unpaywall'
-                result.full_text_source = 'unpaywall'
-                result.retrieval_confidence = 1.0
-                self.stats['pdf_found'] += 1
-                self.stats['source_hits']['unpaywall'] += 1
-                logger.info(f"PDF found via Unpaywall: {doi}")
-                return result
+        # Phase 2: Fast parallel sources (Unpaywall, OpenAlex, DOAJ)
+        phase2_result = self._parallel_pdf_search(
+            doi,
+            result.title,
+            sources=['unpaywall', 'openalex', 'doaj']
+        )
+        if phase2_result:
+            result.pdf_url = phase2_result['url']
+            result.pdf_source = phase2_result['source']
+            result.full_text_source = phase2_result['source']
+            result.retrieval_confidence = phase2_result.get('confidence', 1.0)
+            self.stats['pdf_found'] += 1
+            self.stats['source_hits'][phase2_result['source']] += 1
+            logger.info(f"PDF found via {phase2_result['source']}: {doi}")
+            return result
 
-        # 2. Try OpenAlex (250M+ works, free)
-        if self.enable_openalex:
-            pdf_url = self._try_openalex(doi)
-            if pdf_url:
-                result.pdf_url = pdf_url
-                result.pdf_source = 'openalex'
-                result.full_text_source = 'openalex'
-                result.retrieval_confidence = 1.0
-                self.stats['pdf_found'] += 1
-                self.stats['source_hits']['openalex'] += 1
-                logger.info(f"PDF found via OpenAlex: {doi}")
-                return result
+        # Phase 3: Slower parallel sources (Crossref, PubMed, CORE)
+        phase3_result = self._parallel_pdf_search(
+            doi,
+            result.title,
+            sources=['crossref', 'pubmed', 'core']
+        )
+        if phase3_result:
+            result.pdf_url = phase3_result['url']
+            result.pdf_source = phase3_result['source']
+            result.full_text_source = phase3_result['source']
+            result.retrieval_confidence = phase3_result.get('confidence', 0.95)
+            self.stats['pdf_found'] += 1
+            self.stats['source_hits'][phase3_result['source']] += 1
+            logger.info(f"PDF found via {phase3_result['source']}: {doi}")
+            return result
 
-        # 3. Try Crossref (for link to publisher)
-        if self.enable_crossref:
-            pdf_url = self._try_crossref(doi)
-            if pdf_url:
-                result.pdf_url = pdf_url
-                result.pdf_source = 'crossref'
-                result.full_text_source = 'crossref'
-                result.retrieval_confidence = 0.9
-                self.stats['pdf_found'] += 1
-                self.stats['source_hits']['crossref'] += 1
-                logger.info(f"PDF found via Crossref: {doi}")
-                return result
-
-        # 4. Try DOAJ (guaranteed Open Access)
-        if self.enable_doaj:
-            pdf_url = self._try_doaj(doi, result.title)
-            if pdf_url:
-                result.pdf_url = pdf_url
-                result.pdf_source = 'doaj'
-                result.full_text_source = 'doaj'
-                result.retrieval_confidence = 1.0
-                self.stats['pdf_found'] += 1
-                self.stats['source_hits']['doaj'] += 1
-                logger.info(f"PDF found via DOAJ: {doi}")
-                return result
-
-        # 5. Try PubMed Central (biomedical full-text)
-        if self.enable_pubmed:
-            pdf_url = self._try_pubmed(doi)
-            if pdf_url:
-                result.pdf_url = pdf_url
-                result.pdf_source = 'pubmed'
-                result.full_text_source = 'pubmed_central'
-                result.retrieval_confidence = 1.0
-                self.stats['pdf_found'] += 1
-                self.stats['source_hits']['pubmed'] += 1
-                logger.info(f"PDF found via PubMed Central: {doi}")
-                return result
-
-        # 6. Try CORE
-        if self.core_api_key:
-            pdf_url = self._try_core(doi)
-            if pdf_url:
-                result.pdf_url = pdf_url
-                result.pdf_source = 'core'
-                result.full_text_source = 'core'
-                result.retrieval_confidence = 0.95
-                self.stats['pdf_found'] += 1
-                self.stats['source_hits']['core'] += 1
-                logger.info(f"PDF found via CORE: {doi}")
-                return result
-
-        # 7. Try ArXiv (check if paper has ArXiv version)
+        # Phase 4: ArXiv (slower, uses title search)
         arxiv_url = self._try_arxiv_for_doi(doi, result.title)
         if arxiv_url:
             result.pdf_url = arxiv_url
@@ -617,7 +580,7 @@ class BiblioHunter:
             logger.info(f"PDF found via ArXiv: {doi}")
             return result
 
-        # 8. Try Google Scholar (fallback, has strict rate limits)
+        # Phase 5: Google Scholar fallback (use sparingly)
         if self.enable_google_scholar and result.title:
             pdf_url = self._try_google_scholar(result.title)
             if pdf_url:
@@ -631,6 +594,89 @@ class BiblioHunter:
                 return result
 
         return result
+
+    def _parallel_pdf_search(
+        self,
+        doi: str,
+        title: str,
+        sources: List[str],
+        timeout: float = 10.0
+    ) -> Optional[Dict]:
+        """
+        Search multiple PDF sources in parallel, return first success.
+
+        Args:
+            doi: DOI to search for
+            title: Paper title for fallback
+            sources: List of source names to try
+            timeout: Timeout per source
+
+        Returns:
+            Dict with 'url', 'source', 'confidence' or None
+        """
+        source_methods = {
+            'unpaywall': (self._try_unpaywall, (doi,), 1.0),
+            'openalex': (self._try_openalex, (doi,), 1.0),
+            'doaj': (self._try_doaj, (doi, title), 1.0),
+            'crossref': (self._try_crossref, (doi,), 0.9),
+            'pubmed': (self._try_pubmed, (doi,), 1.0),
+            'core': (self._try_core, (doi,), 0.95),
+        }
+
+        # Filter to enabled sources
+        tasks_to_run = []
+        for source in sources:
+            if source not in source_methods:
+                continue
+
+            method, args, confidence = source_methods[source]
+
+            # Check if source is enabled
+            if source == 'unpaywall' and not self.unpaywall_email:
+                continue
+            if source == 'openalex' and not self.enable_openalex:
+                continue
+            if source == 'doaj' and not self.enable_doaj:
+                continue
+            if source == 'crossref' and not self.enable_crossref:
+                continue
+            if source == 'pubmed' and not self.enable_pubmed:
+                continue
+            if source == 'core' and not self.core_api_key:
+                continue
+
+            tasks_to_run.append((source, method, args, confidence))
+
+        if not tasks_to_run:
+            return None
+
+        # Execute in parallel using ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=len(tasks_to_run)) as executor:
+            future_to_source = {}
+
+            for source, method, args, confidence in tasks_to_run:
+                future = executor.submit(method, *args)
+                future_to_source[future] = (source, confidence)
+
+            # Return first successful result
+            for future in as_completed(future_to_source, timeout=timeout):
+                source, confidence = future_to_source[future]
+                try:
+                    pdf_url = future.result(timeout=1)
+                    if pdf_url:
+                        # Cancel remaining futures
+                        for f in future_to_source:
+                            if not f.done():
+                                f.cancel()
+                        return {
+                            'url': pdf_url,
+                            'source': source,
+                            'confidence': confidence
+                        }
+                except Exception as e:
+                    logger.debug(f"Source {source} failed: {e}")
+
+        return None
 
     def _try_sciencedirect(self, doi: str) -> Optional[Dict]:
         """Try to get full-text from ScienceDirect (Elsevier)."""

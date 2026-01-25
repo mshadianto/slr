@@ -20,3 +20,5 @@ networkx>=3.0
 pyvis
 pymupdf
 pdfplumber
+# AI Priority Screening (Rayyan-style)
+scikit-learn>=1.3.0

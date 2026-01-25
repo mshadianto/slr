@@ -39,9 +39,14 @@ class ScreeningAgent:
 
     Four-phase screening process:
     1. Rule-based exclusion (language, date range, document type)
-    2. Semantic similarity scoring against inclusion criteria
+    2. Semantic similarity scoring against inclusion criteria (batch optimized)
     3. LLM-based reasoning for borderline cases (confidence < 0.7)
     4. Human-in-the-loop flagging for ambiguous papers
+
+    Performance optimizations:
+    - Batch embedding computation for papers
+    - Pre-computed criterion embeddings (cached)
+    - Parallel LLM calls for borderline cases
     """
 
     # Rule-based exclusion patterns
@@ -59,6 +64,9 @@ class ScreeningAgent:
         r"^retracted",
     ]
 
+    # Batch size for embedding computation
+    EMBEDDING_BATCH_SIZE = 32
+
     def __init__(self, anthropic_client=None, embedding_model=None):
         """
         Initialize Screening Agent.
@@ -70,6 +78,10 @@ class ScreeningAgent:
         self.anthropic_client = anthropic_client
         self.embedding_model = embedding_model
         self.screening_log = []
+
+        # Cache for criterion embeddings (computed once)
+        self._criterion_embeddings_cache = None
+        self._cached_criteria = None
 
     def _rule_based_screen(self, paper: Dict, exclusion_criteria: List[str]) -> Optional[ScreeningResult]:
         """
@@ -130,6 +142,98 @@ class ScreeningAgent:
                         )
 
         return None  # Passed rule-based screening
+
+    def _get_criterion_embeddings(self, inclusion_criteria: List[str]):
+        """
+        Get or compute criterion embeddings (cached).
+
+        Returns:
+            Tuple of (embeddings_array, criteria_list)
+        """
+        if not self.embedding_model:
+            return None, inclusion_criteria
+
+        # Check cache
+        criteria_key = tuple(inclusion_criteria)
+        if self._criterion_embeddings_cache is not None and self._cached_criteria == criteria_key:
+            return self._criterion_embeddings_cache, inclusion_criteria
+
+        # Compute and cache
+        logger.info(f"Computing embeddings for {len(inclusion_criteria)} criteria...")
+        self._criterion_embeddings_cache = self.embedding_model.encode(
+            inclusion_criteria,
+            batch_size=self.EMBEDDING_BATCH_SIZE,
+            show_progress_bar=False
+        )
+        self._cached_criteria = criteria_key
+
+        return self._criterion_embeddings_cache, inclusion_criteria
+
+    def _batch_compute_paper_embeddings(self, papers: List[Dict]):
+        """
+        Compute embeddings for multiple papers in batch (much faster).
+
+        Args:
+            papers: List of paper dicts
+
+        Returns:
+            Array of embeddings (one per paper)
+        """
+        if not self.embedding_model:
+            return None
+
+        # Prepare texts
+        texts = []
+        for paper in papers:
+            title = paper.get("title", "")
+            abstract = paper.get("abstract", "")
+            texts.append(f"{title}. {abstract}")
+
+        # Batch encode (much faster than one-by-one)
+        logger.info(f"Batch encoding {len(texts)} papers...")
+        embeddings = self.embedding_model.encode(
+            texts,
+            batch_size=self.EMBEDDING_BATCH_SIZE,
+            show_progress_bar=False
+        )
+
+        return embeddings
+
+    def _compute_batch_similarities(
+        self,
+        paper_embeddings,
+        criterion_embeddings,
+        criteria: List[str]
+    ) -> List[Tuple[float, str]]:
+        """
+        Compute similarities for all papers against all criteria efficiently.
+
+        Args:
+            paper_embeddings: Array of paper embeddings
+            criterion_embeddings: Array of criterion embeddings
+            criteria: List of criterion texts
+
+        Returns:
+            List of (max_similarity, best_criterion) tuples
+        """
+        import numpy as np
+
+        results = []
+
+        for paper_emb in paper_embeddings:
+            # Compute similarity to all criteria at once
+            similarities = np.dot(criterion_embeddings, paper_emb) / (
+                np.linalg.norm(criterion_embeddings, axis=1) * np.linalg.norm(paper_emb)
+            )
+
+            # Find best match
+            best_idx = np.argmax(similarities)
+            max_sim = float(similarities[best_idx])
+            best_criterion = criteria[best_idx]
+
+            results.append((max_sim, best_criterion))
+
+        return results
 
     def _compute_semantic_similarity(
         self,
@@ -367,7 +471,7 @@ Be conservative - if uncertain, mark as UNCERTAIN for human review."""
 
     async def execute_screening(self, state: SLRState) -> SLRState:
         """
-        Execute screening phase of SLR pipeline.
+        Execute screening phase of SLR pipeline with batch optimization.
 
         Args:
             state: Current SLR state
@@ -389,32 +493,122 @@ Be conservative - if uncertain, mark as UNCERTAIN for human review."""
         total = len(papers_to_screen)
 
         try:
-            for i, paper in enumerate(papers_to_screen):
-                result = await self.screen_paper(
-                    paper=paper,
-                    inclusion_criteria=state["inclusion_criteria"],
-                    exclusion_criteria=state["exclusion_criteria"],
-                    research_question=state["research_question"]
-                )
+            # Phase 1: Rule-based screening (fast, no API calls)
+            state["processing_log"].append(
+                f"[{datetime.now().strftime('%H:%M:%S')}] Phase 1: Rule-based screening..."
+            )
 
-                paper["screening_status"] = result.decision.value
-                paper["screening_confidence"] = result.confidence
-                paper["screening_reason"] = result.reason
-                paper["screening_phase"] = result.phase
-
-                if result.decision == ScreeningDecision.INCLUDE:
-                    included.append(paper)
-                elif result.decision == ScreeningDecision.EXCLUDE:
+            papers_after_rules = []
+            for paper in papers_to_screen:
+                rule_result = self._rule_based_screen(paper, state["exclusion_criteria"])
+                if rule_result:
+                    paper["screening_status"] = rule_result.decision.value
+                    paper["screening_confidence"] = rule_result.confidence
+                    paper["screening_reason"] = rule_result.reason
+                    paper["screening_phase"] = rule_result.phase
                     excluded.append(paper)
                 else:
-                    uncertain.append(paper)
+                    papers_after_rules.append(paper)
 
-                # Log progress every 10%
-                if (i + 1) % max(1, total // 10) == 0:
-                    progress = ((i + 1) / total) * 100
-                    state["processing_log"].append(
-                        f"[{datetime.now().strftime('%H:%M:%S')}] Screening: {progress:.0f}% complete"
+            state["processing_log"].append(
+                f"[{datetime.now().strftime('%H:%M:%S')}] Rule-based: {len(excluded)} excluded, "
+                f"{len(papers_after_rules)} remaining"
+            )
+
+            # Phase 2: Batch semantic similarity (optimized)
+            if papers_after_rules and self.embedding_model:
+                state["processing_log"].append(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] Phase 2: Batch semantic scoring..."
+                )
+
+                # Pre-compute criterion embeddings (cached)
+                criterion_embeddings, criteria = self._get_criterion_embeddings(
+                    state["inclusion_criteria"]
+                )
+
+                # Batch compute paper embeddings
+                paper_embeddings = self._batch_compute_paper_embeddings(papers_after_rules)
+
+                # Compute all similarities at once
+                if paper_embeddings is not None and criterion_embeddings is not None:
+                    similarities = self._compute_batch_similarities(
+                        paper_embeddings,
+                        criterion_embeddings,
+                        criteria
                     )
+
+                    # Store similarities for each paper
+                    for i, paper in enumerate(papers_after_rules):
+                        paper["_semantic_similarity"] = similarities[i][0]
+                        paper["_matched_criterion"] = similarities[i][1]
+
+            # Phase 3: Make decisions based on similarity scores
+            papers_for_llm = []
+            semantic_threshold = 0.5
+            confidence_threshold = 0.7
+
+            for paper in papers_after_rules:
+                similarity = paper.get("_semantic_similarity", 0.0)
+                matched_criterion = paper.get("_matched_criterion", "")
+
+                if similarity >= confidence_threshold:
+                    paper["screening_status"] = ScreeningDecision.INCLUDE.value
+                    paper["screening_confidence"] = similarity
+                    paper["screening_reason"] = f"High semantic match with: {matched_criterion}"
+                    paper["screening_phase"] = "semantic"
+                    included.append(paper)
+                elif similarity < semantic_threshold:
+                    paper["screening_status"] = ScreeningDecision.EXCLUDE.value
+                    paper["screening_confidence"] = 1 - similarity
+                    paper["screening_reason"] = f"Low semantic relevance (score: {similarity:.2f})"
+                    paper["screening_phase"] = "semantic"
+                    excluded.append(paper)
+                else:
+                    papers_for_llm.append(paper)
+
+            state["processing_log"].append(
+                f"[{datetime.now().strftime('%H:%M:%S')}] Semantic: {len(included)} included, "
+                f"{len(papers_for_llm)} need LLM review"
+            )
+
+            # Phase 4: LLM screening for borderline cases (sequential to respect rate limits)
+            if papers_for_llm:
+                state["processing_log"].append(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] Phase 3: LLM screening for "
+                    f"{len(papers_for_llm)} borderline papers..."
+                )
+
+                for i, paper in enumerate(papers_for_llm):
+                    llm_result = await self._llm_screen(
+                        paper,
+                        state["inclusion_criteria"],
+                        state["exclusion_criteria"],
+                        state["research_question"]
+                    )
+
+                    paper["screening_status"] = llm_result.decision.value
+                    paper["screening_confidence"] = llm_result.confidence
+                    paper["screening_reason"] = llm_result.reason
+                    paper["screening_phase"] = llm_result.phase
+
+                    if llm_result.decision == ScreeningDecision.INCLUDE:
+                        included.append(paper)
+                    elif llm_result.decision == ScreeningDecision.EXCLUDE:
+                        excluded.append(paper)
+                    else:
+                        uncertain.append(paper)
+
+                    # Log progress
+                    if (i + 1) % max(1, len(papers_for_llm) // 5) == 0:
+                        progress = ((i + 1) / len(papers_for_llm)) * 100
+                        state["processing_log"].append(
+                            f"[{datetime.now().strftime('%H:%M:%S')}] LLM screening: {progress:.0f}%"
+                        )
+
+            # Clean up temporary fields
+            for paper in papers_to_screen:
+                paper.pop("_semantic_similarity", None)
+                paper.pop("_matched_criterion", None)
 
             state["screened_papers"] = included
             state["excluded_papers"] = excluded

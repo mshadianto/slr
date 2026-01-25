@@ -26,6 +26,15 @@ from .bibliometric_agent import (
     create_keyword_chart,
 )
 
+# AI Priority Screening & Exclusion Reasons (NEW)
+from .screening_priority_agent import ScreeningPriorityAgent, ScreeningRating
+from .exclusion_reasons import (
+    ExclusionCategory,
+    ExclusionReasonManager,
+    ExclusionReason,
+    PaperExclusion,
+)
+
 __all__ = [
     "SLRState",
     "Paper",
@@ -56,4 +65,11 @@ __all__ = [
     "create_citation_distribution_chart",
     "create_author_chart",
     "create_keyword_chart",
+    # AI Priority Screening & Exclusion Reasons (NEW)
+    "ScreeningPriorityAgent",
+    "ScreeningRating",
+    "ExclusionCategory",
+    "ExclusionReasonManager",
+    "ExclusionReason",
+    "PaperExclusion",
 ]

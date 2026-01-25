@@ -3,20 +3,30 @@ Muezza AI - Search Cache System
 ================================
 High-performance caching for search results with TTL, LRU eviction,
 and query normalization for maximum cache hits.
+
+Enhanced Features:
+- Adaptive TTL based on cache hit rate
+- Optional compression for large results
+- Hybrid LRU/LFU eviction
+- Memory-efficient storage
 """
 
 import asyncio
+import gzip
 import hashlib
 import json
 import logging
 import time
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Optional, Any, Callable, Tuple
 from dataclasses import dataclass, field
 from collections import OrderedDict
 from functools import wraps
 import threading
 
 logger = logging.getLogger(__name__)
+
+# Compression threshold (compress if larger than 10KB)
+COMPRESSION_THRESHOLD = 10 * 1024
 
 
 @dataclass
@@ -27,14 +37,38 @@ class CacheEntry:
     ttl: int  # seconds
     hits: int = 0
     size_bytes: int = 0
+    compressed: bool = False
+    last_accessed: float = field(default_factory=time.time)
+    frequency: int = 1  # For LFU scoring
 
     def is_expired(self) -> bool:
         """Check if entry has expired."""
         return time.time() - self.created_at > self.ttl
 
     def touch(self):
-        """Update hit count."""
+        """Update hit count and access time."""
         self.hits += 1
+        self.frequency += 1
+        self.last_accessed = time.time()
+
+    def get_eviction_score(self) -> float:
+        """
+        Calculate eviction score (lower = more likely to evict).
+        Hybrid LRU/LFU: considers both recency and frequency.
+        """
+        age = time.time() - self.last_accessed
+        # Score = frequency / log(age + 2), so frequently used recent items score higher
+        import math
+        return self.frequency / math.log(age + 2)
+
+    def get_data(self) -> Any:
+        """Get data, decompressing if needed."""
+        if self.compressed and isinstance(self.data, bytes):
+            try:
+                return json.loads(gzip.decompress(self.data).decode('utf-8'))
+            except Exception:
+                return self.data
+        return self.data
 
 
 class SearchCache:
@@ -42,20 +76,28 @@ class SearchCache:
     High-performance in-memory cache for search results.
 
     Features:
-    - LRU eviction policy
-    - TTL-based expiration
+    - Hybrid LRU/LFU eviction policy
+    - Adaptive TTL based on hit rate
     - Query normalization for better cache hits
     - Thread-safe operations
-    - Memory limit enforcement
-    - Cache statistics
+    - Memory limit enforcement (500MB default)
+    - Optional compression for large entries
+    - Cache statistics and monitoring
     """
+
+    # Adaptive TTL settings
+    MIN_TTL = 900       # 15 minutes minimum
+    MAX_TTL = 21600     # 6 hours maximum
+    TARGET_HIT_RATE = 0.7  # 70% target hit rate
 
     def __init__(
         self,
-        max_entries: int = 1000,
-        max_memory_mb: int = 100,
+        max_entries: int = 2000,
+        max_memory_mb: int = 500,  # Increased from 100MB
         default_ttl: int = 3600,  # 1 hour
-        cleanup_interval: int = 300  # 5 minutes
+        cleanup_interval: int = 300,  # 5 minutes
+        enable_compression: bool = True,
+        adaptive_ttl: bool = True
     ):
         """
         Initialize cache.
@@ -65,11 +107,15 @@ class SearchCache:
             max_memory_mb: Maximum memory usage in MB
             default_ttl: Default TTL in seconds
             cleanup_interval: Interval for cleanup task
+            enable_compression: Compress large entries
+            adaptive_ttl: Automatically adjust TTL based on hit rate
         """
         self.max_entries = max_entries
         self.max_memory_bytes = max_memory_mb * 1024 * 1024
         self.default_ttl = default_ttl
         self.cleanup_interval = cleanup_interval
+        self.enable_compression = enable_compression
+        self.adaptive_ttl = adaptive_ttl
 
         self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
         self._lock = threading.RLock()
@@ -77,8 +123,15 @@ class SearchCache:
             'hits': 0,
             'misses': 0,
             'evictions': 0,
-            'expirations': 0
+            'expirations': 0,
+            'compressions': 0,
+            'bytes_saved': 0
         }
+
+        # Adaptive TTL tracking
+        self._recent_hits = 0
+        self._recent_requests = 0
+        self._current_adaptive_ttl = default_ttl
 
         # Start cleanup task
         self._cleanup_task = None
@@ -136,17 +189,92 @@ class SearchCache:
         except:
             return 1000  # Default estimate
 
+    def _get_adaptive_ttl(self) -> int:
+        """Calculate adaptive TTL based on recent hit rate."""
+        if not self.adaptive_ttl or self._recent_requests < 10:
+            return self.default_ttl
+
+        hit_rate = self._recent_hits / self._recent_requests
+
+        if hit_rate >= self.TARGET_HIT_RATE:
+            # High hit rate - can use longer TTL
+            ttl_adjustment = (hit_rate - self.TARGET_HIT_RATE) / (1 - self.TARGET_HIT_RATE)
+            self._current_adaptive_ttl = int(
+                self.default_ttl + (self.MAX_TTL - self.default_ttl) * ttl_adjustment
+            )
+        else:
+            # Low hit rate - use shorter TTL to refresh data more often
+            ttl_adjustment = (self.TARGET_HIT_RATE - hit_rate) / self.TARGET_HIT_RATE
+            self._current_adaptive_ttl = int(
+                self.default_ttl - (self.default_ttl - self.MIN_TTL) * ttl_adjustment
+            )
+
+        # Clamp to bounds
+        self._current_adaptive_ttl = max(
+            self.MIN_TTL,
+            min(self.MAX_TTL, self._current_adaptive_ttl)
+        )
+
+        # Reset recent counters periodically
+        if self._recent_requests >= 100:
+            self._recent_hits = int(self._recent_hits * 0.5)
+            self._recent_requests = int(self._recent_requests * 0.5)
+
+        return self._current_adaptive_ttl
+
+    def _compress_data(self, data: Any) -> Tuple[Any, int, bool]:
+        """
+        Compress data if beneficial.
+
+        Returns:
+            Tuple of (data, size_bytes, is_compressed)
+        """
+        try:
+            json_data = json.dumps(data, default=str).encode('utf-8')
+            original_size = len(json_data)
+
+            if not self.enable_compression or original_size < COMPRESSION_THRESHOLD:
+                return data, original_size, False
+
+            compressed = gzip.compress(json_data, compresslevel=6)
+            compressed_size = len(compressed)
+
+            # Only use compression if it saves at least 20%
+            if compressed_size < original_size * 0.8:
+                self._stats['compressions'] += 1
+                self._stats['bytes_saved'] += original_size - compressed_size
+                return compressed, compressed_size, True
+
+            return data, original_size, False
+        except Exception:
+            return data, 1000, False
+
     def _evict_if_needed(self):
-        """Evict entries if over limits."""
+        """Evict entries using hybrid LRU/LFU strategy."""
         # Evict by entry count
         while len(self._cache) >= self.max_entries:
-            self._cache.popitem(last=False)
+            # Find entry with lowest eviction score
+            if len(self._cache) > 10:
+                # For larger caches, use score-based eviction
+                worst_key = min(
+                    self._cache.keys(),
+                    key=lambda k: self._cache[k].get_eviction_score()
+                )
+                del self._cache[worst_key]
+            else:
+                # For small caches, just use FIFO
+                self._cache.popitem(last=False)
             self._stats['evictions'] += 1
 
         # Evict by memory
         total_size = sum(e.size_bytes for e in self._cache.values())
         while total_size > self.max_memory_bytes and self._cache:
-            _, entry = self._cache.popitem(last=False)
+            # Use score-based eviction for memory pressure
+            worst_key = min(
+                self._cache.keys(),
+                key=lambda k: self._cache[k].get_eviction_score()
+            )
+            entry = self._cache.pop(worst_key)
             total_size -= entry.size_bytes
             self._stats['evictions'] += 1
 
@@ -165,6 +293,9 @@ class SearchCache:
         key = self._generate_key(query, source, params)
 
         with self._lock:
+            # Track for adaptive TTL
+            self._recent_requests += 1
+
             entry = self._cache.get(key)
 
             if entry is None:
@@ -181,9 +312,10 @@ class SearchCache:
             self._cache.move_to_end(key)
             entry.touch()
             self._stats['hits'] += 1
+            self._recent_hits += 1
 
             logger.debug(f"Cache HIT for query: {query[:50]}...")
-            return entry.data
+            return entry.get_data()
 
     def set(
         self,
@@ -201,29 +333,36 @@ class SearchCache:
             data: Data to cache
             source: Source identifier
             params: Additional parameters
-            ttl: Time-to-live in seconds (uses default if not specified)
+            ttl: Time-to-live in seconds (uses adaptive TTL if not specified)
         """
         if data is None:
             return
 
         key = self._generate_key(query, source, params)
-        ttl = ttl or self.default_ttl
-        size = self._estimate_size(data)
+
+        # Use adaptive TTL if not explicitly specified
+        if ttl is None:
+            ttl = self._get_adaptive_ttl()
+
+        # Compress data if beneficial
+        stored_data, size, compressed = self._compress_data(data)
 
         with self._lock:
             self._evict_if_needed()
 
             self._cache[key] = CacheEntry(
-                data=data,
+                data=stored_data,
                 created_at=time.time(),
                 ttl=ttl,
-                size_bytes=size
+                size_bytes=size,
+                compressed=compressed
             )
 
             # Move to end
             self._cache.move_to_end(key)
 
-        logger.debug(f"Cache SET for query: {query[:50]}... (TTL: {ttl}s)")
+        compression_note = " (compressed)" if compressed else ""
+        logger.debug(f"Cache SET for query: {query[:50]}... (TTL: {ttl}s{compression_note})")
 
     def invalidate(self, query: str = None, source: str = None):
         """
@@ -260,22 +399,31 @@ class SearchCache:
                 logger.debug(f"Cleaned up {len(expired_keys)} expired entries")
 
     def get_stats(self) -> Dict:
-        """Get cache statistics."""
+        """Get cache statistics including compression and adaptive TTL info."""
         with self._lock:
             total_requests = self._stats['hits'] + self._stats['misses']
             hit_rate = (self._stats['hits'] / total_requests * 100) if total_requests > 0 else 0
             total_size = sum(e.size_bytes for e in self._cache.values())
+            compressed_entries = sum(1 for e in self._cache.values() if e.compressed)
 
             return {
                 'entries': len(self._cache),
                 'max_entries': self.max_entries,
-                'memory_used_mb': total_size / (1024 * 1024),
+                'memory_used_mb': round(total_size / (1024 * 1024), 2),
                 'max_memory_mb': self.max_memory_bytes / (1024 * 1024),
                 'hits': self._stats['hits'],
                 'misses': self._stats['misses'],
                 'hit_rate': f"{hit_rate:.1f}%",
                 'evictions': self._stats['evictions'],
-                'expirations': self._stats['expirations']
+                'expirations': self._stats['expirations'],
+                # Compression stats
+                'compressed_entries': compressed_entries,
+                'total_compressions': self._stats['compressions'],
+                'bytes_saved_mb': round(self._stats['bytes_saved'] / (1024 * 1024), 2),
+                # Adaptive TTL stats
+                'adaptive_ttl_enabled': self.adaptive_ttl,
+                'current_adaptive_ttl': self._current_adaptive_ttl,
+                'compression_enabled': self.enable_compression
             }
 
 

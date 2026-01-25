@@ -44,6 +44,16 @@ class Paper:
     exclusion_reason: Optional[str] = None
     screening_confidence: float = 0.0
 
+    # AI Priority Screening (NEW - Rayyan-style)
+    ai_priority_rating: float = 0.0  # 1-5 star rating
+    ai_priority_confidence: float = 0.0  # 0-1 confidence
+    ai_relevance_score: float = 0.0  # Raw relevance probability
+
+    # Enhanced Exclusion Reasons (NEW - PRISMA 2020)
+    exclusion_category: Optional[str] = None  # ExclusionCategory value
+    exclusion_reason_detail: Optional[str] = None  # Specific reason text
+    exclusion_is_custom: bool = False  # Whether reason is user-defined
+
     # Quality assessment metadata
     quality_score: Optional[float] = None
     quality_category: Optional[str] = None  # HIGH, MODERATE, LOW, CRITICAL
@@ -71,6 +81,14 @@ class Paper:
             "screening_status": self.screening_status,
             "quality_score": self.quality_score,
             "quality_category": self.quality_category,
+            # AI Priority fields
+            "ai_priority_rating": self.ai_priority_rating,
+            "ai_priority_confidence": self.ai_priority_confidence,
+            "ai_relevance_score": self.ai_relevance_score,
+            # Enhanced exclusion fields
+            "exclusion_category": self.exclusion_category,
+            "exclusion_reason_detail": self.exclusion_reason_detail,
+            "exclusion_is_custom": self.exclusion_is_custom,
         }
 
 
@@ -164,6 +182,20 @@ class SLRState(TypedDict):
     key_papers: List[Dict]  # Most influential papers in network
     research_clusters: Dict[int, List[str]]  # cluster_id -> paper_ids
 
+    # AI Priority Screening (NEW - Rayyan-style)
+    ai_ratings_computed: bool
+    ai_priority_model_trained: bool
+    screening_decisions_count: int
+    ai_ratings: Dict[str, Dict]  # doi -> ScreeningRating dict
+
+    # Enhanced Exclusion Tracking (NEW - PRISMA 2020)
+    exclusion_by_category: Dict[str, int]  # category -> count
+    custom_exclusion_reasons: List[Dict]  # User-defined reasons
+    exclusion_manager_state: Dict[str, Any]  # Serialized ExclusionReasonManager
+
+    # UI Language Preference (NEW - Bilingual)
+    ui_language: str  # "id" or "en"
+
     # Processing metadata
     processing_log: List[str]
     errors: List[str]
@@ -234,6 +266,20 @@ def create_initial_state(
         network_metrics={},
         key_papers=[],
         research_clusters={},
+
+        # AI Priority Screening (NEW)
+        ai_ratings_computed=False,
+        ai_priority_model_trained=False,
+        screening_decisions_count=0,
+        ai_ratings={},
+
+        # Enhanced Exclusion Tracking (NEW)
+        exclusion_by_category={},
+        custom_exclusion_reasons=[],
+        exclusion_manager_state={},
+
+        # UI Language (NEW)
+        ui_language="id",
 
         # Metadata
         processing_log=[],

@@ -70,6 +70,13 @@ from agents.logic_continuity_agent import LogicContinuityAgent
 from agents.forensic_audit_agent import ForensicAuditAgent, VerificationStatus
 from agents.docx_generator import DocxGenerator
 
+# AI Priority Screening & Exclusion Reasons (NEW)
+from agents.screening_priority_agent import ScreeningPriorityAgent, ScreeningRating
+from agents.exclusion_reasons import (
+    ExclusionCategory, ExclusionReasonManager, ExclusionReason, PaperExclusion
+)
+from utils.i18n import get_text, set_language, get_current_language, SUPPORTED_LANGUAGES
+
 # Page configuration
 st.set_page_config(
     page_title="Muezza AI | Faithful Research Companion",
@@ -1505,11 +1512,32 @@ def init_session_state():
         "generated_bibliography": [],
         "verification_modal_open": False,
         "selected_paper_for_verification": None,
+        # AI Priority Screening (NEW - Rayyan-style)
+        "ai_priority_agent": None,
+        "ai_ratings": {},
+        "ai_ratings_computed": False,
+        "screening_decisions_count": 0,
+        # Exclusion Reason Management (NEW)
+        "exclusion_manager": None,
+        "show_exclusion_modal": False,
+        "paper_to_exclude": None,
+        # UI Language (NEW - Bilingual)
+        "ui_language": "id",
     }
 
     for key, default in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = default
+
+    # Initialize AI Priority Agent if not exists
+    if st.session_state.ai_priority_agent is None:
+        st.session_state.ai_priority_agent = ScreeningPriorityAgent()
+
+    # Initialize Exclusion Manager if not exists
+    if st.session_state.exclusion_manager is None:
+        st.session_state.exclusion_manager = ExclusionReasonManager(
+            language=st.session_state.ui_language
+        )
 
 init_session_state()
 
@@ -1970,6 +1998,26 @@ def main():
         </div>
         """, unsafe_allow_html=True)
 
+        # Language Switcher (NEW - Bilingual UI)
+        lang_col1, lang_col2 = st.columns([1, 3])
+        with lang_col1:
+            st.markdown("🌐")
+        with lang_col2:
+            selected_lang = st.selectbox(
+                "Language",
+                options=list(SUPPORTED_LANGUAGES.keys()),
+                format_func=lambda x: SUPPORTED_LANGUAGES[x],
+                index=0 if st.session_state.ui_language == "id" else 1,
+                label_visibility="collapsed",
+                key="language_selector"
+            )
+            if selected_lang != st.session_state.ui_language:
+                st.session_state.ui_language = selected_lang
+                set_language(selected_lang)
+                if st.session_state.exclusion_manager:
+                    st.session_state.exclusion_manager.language = selected_lang
+                st.rerun()
+
         # API Status Section
         st.markdown("### 🔌 API Status")
         config = check_configuration()
@@ -2055,13 +2103,13 @@ def main():
             run_button = st.button(
                 "🚀 Start",
                 type="primary",
-                width="stretch",
+                use_container_width=True,
                 disabled=st.session_state.is_running
             )
         with col2:
             reset_button = st.button(
                 "🔄 Reset",
-                width="stretch"
+                use_container_width=True
             )
 
         if reset_button:
@@ -2126,7 +2174,7 @@ def main():
         # Sankey Diagram
         st.plotly_chart(
             render_prisma_sankey(stats),
-            width="stretch",
+            use_container_width=True,
             config={'displayModeBar': False}
         )
 
@@ -2156,7 +2204,7 @@ def main():
             st.markdown("<br>", unsafe_allow_html=True)
             st.plotly_chart(
                 render_quality_chart(st.session_state.quality_distribution),
-                width="stretch",
+                use_container_width=True,
                 config={'displayModeBar': False}
             )
 
@@ -2182,6 +2230,169 @@ def main():
         st.balloons()
         st.rerun()
 
+    # ========== AI PRIORITY SCREENING (NEW - Rayyan-style) ==========
+    # Show this section when there are papers to screen
+    pending_papers = st.session_state.get("slr_state", {})
+    if pending_papers:
+        pending_papers = pending_papers.get("deduplicated_papers", [])
+
+    screened_papers = st.session_state.get("slr_state", {})
+    if screened_papers:
+        screened_papers = screened_papers.get("screened_papers", [])
+
+    excluded_papers = st.session_state.get("slr_state", {})
+    if excluded_papers:
+        excluded_papers = excluded_papers.get("excluded_papers", [])
+
+    total_decisions = len(screened_papers or []) + len(excluded_papers or [])
+
+    if pending_papers or total_decisions > 0:
+        st.markdown("---")
+        st.markdown(f"""
+        <div class="section-header">
+            <div class="icon">⭐</div>
+            <h2>{get_text('ai_priority_title')}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # AI Priority info box
+        priority_col1, priority_col2 = st.columns([2, 1])
+
+        with priority_col1:
+            st.markdown(f"""
+            <div class="glass-card" style="padding: 1rem;">
+                <p style="color: var(--slate-300); margin: 0;">
+                    {get_text('ai_priority_subtitle')}
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Progress towards minimum decisions
+            agent = st.session_state.ai_priority_agent
+            progress = agent.get_decisions_progress(total_decisions)
+
+            if not progress["can_compute"]:
+                st.info(
+                    f"⏳ {get_text('need_more_decisions')}: "
+                    f"{progress['current']}/{progress['required']} "
+                    f"({progress['remaining']} {get_text('minimum_required')})"
+                )
+                st.progress(progress["percentage"] / 100)
+            else:
+                st.success(f"✅ {get_text('msg_ratings_ready')}")
+
+                # Compute Ratings Button
+                if st.button(f"⭐ {get_text('compute_ratings')}", type="primary"):
+                    with st.spinner(get_text('computing')):
+                        try:
+                            import asyncio
+                            ratings = asyncio.run(
+                                agent.compute_ratings(
+                                    pending_papers or [],
+                                    screened_papers or [],
+                                    excluded_papers or []
+                                )
+                            )
+                            st.session_state.ai_ratings = {
+                                r.paper_doi: r.to_dict() for r in ratings
+                            }
+                            st.session_state.ai_ratings_computed = True
+                            st.success(f"✅ {get_text('ratings_computed')}: {len(ratings)} papers")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error computing ratings: {e}")
+
+        with priority_col2:
+            # Statistics
+            if st.session_state.ai_ratings_computed:
+                stats = agent.get_statistics()
+                st.markdown(f"""
+                <div class="glass-card" style="padding: 1rem; text-align: center;">
+                    <h3 style="color: var(--gold-400); margin: 0;">{stats['total_ratings']}</h3>
+                    <p style="color: var(--slate-400); font-size: 0.8rem; margin: 0;">
+                        Papers Rated
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # Priority Queue Display (if ratings computed)
+        if st.session_state.ai_ratings_computed and st.session_state.ai_ratings:
+            st.markdown(f"### {get_text('priority_queue')}")
+
+            # Get priority queue
+            priority_queue = agent.get_priority_queue(pending_papers or [])
+
+            if priority_queue:
+                # Display top papers
+                for i, paper in enumerate(priority_queue[:10]):  # Show top 10
+                    rating = paper.get("ai_priority_rating", 0)
+                    stars = "★" * int(rating) + "☆" * (5 - int(rating))
+                    confidence = paper.get("ai_priority_confidence", 0) * 100
+
+                    with st.container():
+                        cols = st.columns([4, 1, 1, 1])
+                        with cols[0]:
+                            st.markdown(f"""
+                            <div style="padding: 0.5rem;">
+                                <strong style="color: var(--slate-200);">{paper.get('title', 'No title')[:80]}...</strong>
+                                <br><span style="color: var(--slate-500); font-size: 0.8rem;">{paper.get('year', '')} | {paper.get('journal', '')[:30]}</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        with cols[1]:
+                            st.markdown(f"<span style='color: var(--gold-400);'>{stars}</span>", unsafe_allow_html=True)
+                        with cols[2]:
+                            st.markdown(f"<span style='color: var(--slate-400);'>{confidence:.0f}%</span>", unsafe_allow_html=True)
+                        with cols[3]:
+                            # Quick action buttons (for future manual screening)
+                            st.markdown("📄")
+
+    # ========== EXCLUSION STATISTICS (NEW - PRISMA 2020) ==========
+    if st.session_state.exclusion_manager and st.session_state.exclusion_manager.exclusions:
+        st.markdown("---")
+        st.markdown(f"""
+        <div class="section-header">
+            <div class="icon">📉</div>
+            <h2>{get_text('exclusion_statistics')}</h2>
+        </div>
+        """, unsafe_allow_html=True)
+
+        manager = st.session_state.exclusion_manager
+        stats = manager.get_exclusion_statistics()
+
+        if stats["total"] > 0:
+            # Summary metrics
+            excl_col1, excl_col2 = st.columns([1, 2])
+
+            with excl_col1:
+                st.metric(
+                    label=get_text('total_excluded'),
+                    value=stats["total"],
+                    delta=None
+                )
+
+            with excl_col2:
+                # Bar chart by category
+                if stats["by_category"]:
+                    categories = [item["label"] for item in stats["by_category"]]
+                    counts = [item["count"] for item in stats["by_category"]]
+
+                    fig = px.bar(
+                        x=counts,
+                        y=categories,
+                        orientation='h',
+                        color_discrete_sequence=["#ef4444"],
+                        labels={"x": get_text("papers_excluded"), "y": get_text("exclusion_category")}
+                    )
+                    fig.update_layout(
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font=dict(color='#94a3b8'),
+                        margin=dict(l=0, r=0, t=0, b=0),
+                        height=200,
+                        showlegend=False,
+                    )
+                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+
     # ========== FORENSIC AUDIT TABLE ==========
     if st.session_state.results_df is not None and not st.session_state.results_df.empty:
         st.markdown("---")
@@ -2201,7 +2412,7 @@ def main():
         # Display table
         st.dataframe(
             df,
-            width="stretch",
+            use_container_width=True,
             height=400,
             column_config={
                 "Title": st.column_config.TextColumn("Paper Title", width="large"),
@@ -2226,7 +2437,7 @@ def main():
             )
 
         with verify_cols[1]:
-            verify_btn = st.button("🔬 Verify Citation", type="primary", width="stretch")
+            verify_btn = st.button("🔬 Verify Citation", type="primary", use_container_width=True)
 
         if verify_btn and selected_doi:
             paper_row = df[df['DOI'] == selected_doi].iloc[0]
@@ -2263,7 +2474,7 @@ def main():
                 data=csv_data,
                 file_name="muezza_audit_results.csv",
                 mime="text/csv",
-                width="stretch"
+                use_container_width=True
             )
 
         with export_cols[1]:
@@ -2273,14 +2484,14 @@ def main():
                 data=json_data,
                 file_name="muezza_audit_results.json",
                 mime="application/json",
-                width="stretch"
+                use_container_width=True
             )
 
         with export_cols[2]:
-            st.button("📊 Export PRISMA", width="stretch")
+            st.button("📊 Export PRISMA", use_container_width=True)
 
         with export_cols[3]:
-            st.button("📧 Share Report", width="stretch", disabled=True)
+            st.button("📧 Share Report", use_container_width=True, disabled=True)
 
     # ========== BIBLIOMETRIC ANALYSIS ==========
     if st.session_state.slr_state and st.session_state.slr_state.get("synthesis_ready"):
@@ -2333,7 +2544,7 @@ def main():
                 if stats.publication_years:
                     trend_fig = create_publication_trend_chart(stats.publication_years)
                     if trend_fig:
-                        st.plotly_chart(trend_fig, width="stretch")
+                        st.plotly_chart(trend_fig, use_container_width=True)
                 else:
                     st.info("No publication year data available")
 
@@ -2341,7 +2552,7 @@ def main():
                 if stats.citation_distribution:
                     cite_fig = create_citation_distribution_chart(stats.citation_distribution)
                     if cite_fig:
-                        st.plotly_chart(cite_fig, width="stretch")
+                        st.plotly_chart(cite_fig, use_container_width=True)
                 else:
                     st.info("No citation data available")
 
@@ -2352,7 +2563,7 @@ def main():
                 if stats.top_journals:
                     journal_fig = create_journal_distribution_chart(stats.top_journals)
                     if journal_fig:
-                        st.plotly_chart(journal_fig, width="stretch")
+                        st.plotly_chart(journal_fig, use_container_width=True)
                 else:
                     st.info("No journal data available")
 
@@ -2360,7 +2571,7 @@ def main():
                 if stats.top_authors:
                     author_fig = create_author_chart(stats.top_authors)
                     if author_fig:
-                        st.plotly_chart(author_fig, width="stretch")
+                        st.plotly_chart(author_fig, use_container_width=True)
                 else:
                     st.info("No author data available")
 
@@ -2369,7 +2580,7 @@ def main():
                 st.markdown("#### Top Keywords")
                 keyword_fig = create_keyword_chart(stats.top_keywords)
                 if keyword_fig:
-                    st.plotly_chart(keyword_fig, width="stretch")
+                    st.plotly_chart(keyword_fig, use_container_width=True)
 
             # Top Cited Papers Table
             if stats.top_cited_papers:
@@ -2396,7 +2607,7 @@ def main():
                 top_cited_df = pd.DataFrame(top_cited_data)
                 st.dataframe(
                     top_cited_df,
-                    width="stretch",
+                    use_container_width=True,
                     hide_index=True,
                     column_config={
                         "Rank": st.column_config.NumberColumn("Rank", width="small"),
@@ -2594,7 +2805,7 @@ def main():
         generate_btn = st.button(
             "✨ Generate Full Report",
             type="primary",
-            width="stretch",
+            use_container_width=True,
             disabled=st.session_state.report_generating
         )
 
@@ -2734,11 +2945,11 @@ def main():
                 data=md_report,
                 file_name="muezza_research_report.md",
                 mime="text/markdown",
-                width="stretch"
+                use_container_width=True
             )
 
         with download_cols[1]:
-            word_btn = st.button("📝 Word (Simple)", width="stretch")
+            word_btn = st.button("📝 Word (Simple)", use_container_width=True)
 
             if word_btn:
                 try:
@@ -2757,14 +2968,14 @@ def main():
                             data=word_data,
                             file_name="muezza_research_report.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            width="stretch"
+                            use_container_width=True
                         )
                         os.unlink(tmp_path)
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
 
         with download_cols[2]:
-            word_pro_btn = st.button("📑 Word (Pro)", width="stretch")
+            word_pro_btn = st.button("📑 Word (Pro)", use_container_width=True)
 
             if word_pro_btn:
                 try:
@@ -2807,7 +3018,7 @@ def main():
                         data=word_data,
                         file_name=f"Muezza_SLR_{st.session_state.researcher_name.replace(' ', '_')}.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        width="stretch"
+                        use_container_width=True
                     )
                     os.unlink(tmp_path)
 
@@ -2836,7 +3047,7 @@ def main():
                 data=json_report,
                 file_name="muezza_metadata.json",
                 mime="application/json",
-                width="stretch"
+                use_container_width=True
             )
 
     # ========== FOOTER ==========
