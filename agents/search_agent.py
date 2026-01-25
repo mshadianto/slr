@@ -333,7 +333,22 @@ class SearchAgent:
         state["current_phase"] = "search"
         state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Search Agent: Starting...")
 
+        # Log original research question
+        state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Original question: {state['research_question'][:100]}...")
+
         try:
+            # Log translation attempt
+            try:
+                from api.query_translator import translate_research_query, detect_query_language
+                lang = detect_query_language(state["research_question"])
+                state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Detected language: {lang}")
+
+                translated, was_translated = translate_research_query(state["research_question"])
+                if was_translated:
+                    state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Translated to: {translated[:100]}...")
+            except Exception as trans_err:
+                state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Translation error: {str(trans_err)}")
+
             # Generate Boolean query
             query = self.generate_boolean_query(
                 research_question=state["research_question"],
@@ -341,33 +356,44 @@ class SearchAgent:
                 date_range=state["date_range"],
             )
             state["search_queries"].append(query)
-            state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Generated query: {query[:100]}...")
+            state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Generated Scopus query: {query}")
 
-            # Execute search via Scopus API (with caching for speed)
+            # Check Scopus client status
             if self.scopus_client:
+                api_key = getattr(self.scopus_client, 'api_key', '')
+                masked_key = f"{api_key[:8]}...{api_key[-4:]}" if len(api_key) > 12 else "***"
+                state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Scopus API key: {masked_key}")
+
                 # Use cached_search for faster repeated queries
+                state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Executing Scopus search...")
                 if hasattr(self.scopus_client, 'cached_search'):
                     results = await self.scopus_client.cached_search(query)
                     state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Using cached search...")
                 else:
                     results = await self.scopus_client.search(query)
 
+                state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Scopus returned {len(results)} results")
                 state["raw_papers"] = results
                 state["prisma_stats"]["identified"] = len(results)
 
                 # Check if we need to refine
                 if len(results) < 50 or len(results) > 2000:
+                    state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Refining query (results: {len(results)})...")
                     refined_query = self.refine_query(query, len(results))
                     if refined_query != query:
+                        state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Refined query: {refined_query}")
                         state["search_queries"].append(refined_query)
                         if hasattr(self.scopus_client, 'cached_search'):
                             results = await self.scopus_client.cached_search(refined_query)
                         else:
                             results = await self.scopus_client.search(refined_query)
+                        state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Refined search returned {len(results)} results")
                         state["raw_papers"] = results
                         state["prisma_stats"]["identified"] = len(results)
             else:
-                # No client - return empty for testing
+                # No client - log the issue
+                state["processing_log"].append(f"[{datetime.now().strftime('%H:%M:%S')}] ERROR: No Scopus client! Check SCOPUS_API_KEY env var")
+                state["errors"].append("Scopus client not initialized - SCOPUS_API_KEY may be missing")
                 state["raw_papers"] = []
                 state["prisma_stats"]["identified"] = 0
 

@@ -77,24 +77,42 @@ class ScopusClient:
             "Accept": "application/json",
         }
 
+        # Log request details
+        masked_key = f"{self.api_key[:8]}..." if len(self.api_key) > 8 else "***"
+        logger.info(f"Scopus API request: key={masked_key}, query={params.get('query', '')[:50]}...")
+
         async with session.get(
             self.BASE_URL,
             params=params,
             headers=headers
         ) as response:
             self._request_count += 1
+            logger.info(f"Scopus API response: status={response.status}")
 
             if response.status == 429:
-                logger.warning("Rate limit exceeded, waiting...")
+                logger.error("Scopus rate limit exceeded (429), waiting 60s...")
                 await asyncio.sleep(60)
                 raise Exception("Rate limit exceeded")
 
+            if response.status == 401:
+                error_text = await response.text()
+                logger.error(f"Scopus API authentication failed (401): Invalid API key or no access. Response: {error_text[:200]}")
+                raise Exception(f"Authentication failed (401): Check your SCOPUS_API_KEY")
+
+            if response.status == 400:
+                error_text = await response.text()
+                logger.error(f"Scopus API bad request (400): {error_text[:200]}")
+                raise Exception(f"Bad request (400): Query syntax error")
+
             if response.status != 200:
                 error_text = await response.text()
-                logger.error(f"Scopus API error {response.status}: {error_text}")
+                logger.error(f"Scopus API error {response.status}: {error_text[:200]}")
                 raise Exception(f"API error: {response.status}")
 
-            return await response.json()
+            data = await response.json()
+            total_results = data.get("search-results", {}).get("opensearch:totalResults", 0)
+            logger.info(f"Scopus API success: {total_results} total results found")
+            return data
 
     def _parse_entry(self, entry: Dict) -> Dict:
         """Parse a single Scopus entry into our paper format."""
