@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # API Keys
     anthropic_api_key: str = Field(default="", env="ANTHROPIC_API_KEY")
     scopus_api_key: str = Field(default="", env="SCOPUS_API_KEY")
+    elsevier_inst_token: Optional[str] = Field(default=None, env="ELSEVIER_INST_TOKEN")
     unpaywall_email: str = Field(default="", env="UNPAYWALL_EMAIL")
     semantic_scholar_api_key: Optional[str] = Field(default=None, env="SEMANTIC_SCHOLAR_API_KEY")
     core_api_key: Optional[str] = Field(default=None, env="CORE_API_KEY")
@@ -43,6 +44,7 @@ class Settings(BaseSettings):
 
     # API Endpoints
     scopus_base_url: str = "https://api.elsevier.com/content/search/scopus"
+    sciencedirect_base_url: str = "https://api.elsevier.com/content/article"
     unpaywall_base_url: str = "https://api.unpaywall.org/v2"
     core_base_url: str = "https://api.core.ac.uk/v3"
     arxiv_base_url: str = "http://export.arxiv.org/api/query"

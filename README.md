@@ -61,7 +61,7 @@
 
 ### BiblioHunter - Intelligent Paper Retrieval
 - **Multi-identifier support** - DOI, ArXiv ID, PMID, Semantic Scholar ID, Title search
-- **Waterfall PDF retrieval** - 10 sources: Semantic Scholar → Unpaywall → OpenAlex → Crossref → DOAJ → PubMed Central → CORE → ArXiv → Google Scholar → Virtual Full-Text
+- **Waterfall PDF retrieval** - 11 sources: ScienceDirect → Semantic Scholar → Unpaywall → OpenAlex → Crossref → DOAJ → PubMed Central → CORE → ArXiv → Google Scholar → Virtual Full-Text
 - **Virtual Full-Text** - TL;DR + Abstract + Citation Contexts + Related Papers (fallback for paywalled papers)
 - **In-memory caching** - 9000x+ speedup on repeated requests
 - **Parallel batch processing** - Configurable workers with progress callbacks
@@ -164,6 +164,7 @@ SEMANTIC_SCHOLAR_API_KEY=your_s2_key
 UNPAYWALL_EMAIL=your@email.com
 
 # Optional (enhances PDF retrieval)
+ELSEVIER_INST_TOKEN=your_inst_token   # For off-campus ScienceDirect access
 CORE_API_KEY=your_core_key
 OPENALEX_EMAIL=your@email.com
 NCBI_API_KEY=your_ncbi_key
@@ -345,6 +346,7 @@ Muezza-AI/
 ├── api/                          # External API clients
 │   ├── biblio_hunter.py          # Waterfall paper retrieval engine
 │   ├── scopus.py                 # Scopus API client
+│   ├── sciencedirect.py          # ScienceDirect full-text client
 │   ├── semantic_scholar.py       # Semantic Scholar client
 │   ├── unpaywall.py              # Unpaywall API client
 │   ├── openalex.py               # OpenAlex API client
@@ -369,7 +371,7 @@ Muezza-AI/
 | Service | Required | Free Tier | Get Key |
 |---------|----------|-----------|---------|
 | Anthropic | Yes | No | [console.anthropic.com](https://console.anthropic.com) |
-| Scopus | Yes | Yes (limited) | [dev.elsevier.com](https://dev.elsevier.com) |
+| Scopus/ScienceDirect | Yes | Yes (limited) | [dev.elsevier.com](https://dev.elsevier.com) |
 | Semantic Scholar | No | Yes (100 req/5min) | [semanticscholar.org/product/api](https://www.semanticscholar.org/product/api) |
 | Unpaywall | No | Yes (100K/day) | Email only |
 | OpenAlex | No | Yes (100K/day) | No key needed (email optional) |

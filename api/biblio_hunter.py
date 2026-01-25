@@ -126,15 +126,16 @@ class BiblioHunter:
     - Title-based search fallback
 
     PDF Sources (waterfall):
-    1. Semantic Scholar Open Access
-    2. Unpaywall
-    3. OpenAlex (NEW - 250M+ works)
-    4. Crossref (NEW - metadata enrichment)
-    5. DOAJ (Directory of Open Access Journals)
-    6. PubMed Central (NEW - biomedical full-text)
-    7. CORE
-    8. ArXiv
-    9. Google Scholar (fallback)
+    1. ScienceDirect (Elsevier full-text - requires institutional access)
+    2. Semantic Scholar Open Access
+    3. Unpaywall
+    4. OpenAlex (250M+ works)
+    5. Crossref (metadata enrichment)
+    6. DOAJ (Directory of Open Access Journals)
+    7. PubMed Central (biomedical full-text)
+    8. CORE
+    9. ArXiv
+    10. Google Scholar (fallback)
 
     When no PDF available:
     - Generates Virtual Full-Text from abstract + citation contexts + TL;DR
@@ -147,6 +148,9 @@ class BiblioHunter:
         core_api_key: str = None,
         openalex_email: str = None,
         ncbi_api_key: str = None,
+        scopus_api_key: str = None,
+        elsevier_inst_token: str = None,
+        enable_sciencedirect: bool = True,
         enable_doaj: bool = True,
         enable_openalex: bool = True,
         enable_crossref: bool = True,
@@ -165,6 +169,9 @@ class BiblioHunter:
             core_api_key: CORE API key (optional)
             openalex_email: Email for OpenAlex polite pool (optional)
             ncbi_api_key: NCBI API key for PubMed (optional)
+            scopus_api_key: Elsevier/Scopus API key for ScienceDirect (optional)
+            elsevier_inst_token: Elsevier institutional token for off-campus access (optional)
+            enable_sciencedirect: Enable ScienceDirect full-text retrieval (default True)
             enable_doaj: Enable DOAJ search (default True, no API key needed)
             enable_openalex: Enable OpenAlex search (default True)
             enable_crossref: Enable Crossref search (default True)
@@ -179,6 +186,9 @@ class BiblioHunter:
         self.core_api_key = core_api_key
         self.openalex_email = openalex_email
         self.ncbi_api_key = ncbi_api_key
+        self.scopus_api_key = scopus_api_key
+        self.elsevier_inst_token = elsevier_inst_token
+        self.enable_sciencedirect = enable_sciencedirect
         self.enable_doaj = enable_doaj
         self.enable_openalex = enable_openalex
         self.enable_crossref = enable_crossref
@@ -207,6 +217,7 @@ class BiblioHunter:
             'virtual_fulltext_generated': 0,
             'not_found': 0,
             'source_hits': {
+                'sciencedirect': 0,
                 'semantic_scholar': 0,
                 'unpaywall': 0,
                 'openalex': 0,
@@ -494,7 +505,29 @@ class BiblioHunter:
     ) -> PaperResult:
         """Try multiple sources to find PDF using enhanced waterfall strategy."""
 
-        # 1. Try Unpaywall
+        # 1. Try ScienceDirect (Elsevier full-text)
+        if self.enable_sciencedirect and self.scopus_api_key:
+            sd_result = self._try_sciencedirect(doi)
+            if sd_result:
+                if sd_result.get('full_text'):
+                    result.full_text = sd_result['full_text']
+                    result.full_text_source = 'sciencedirect'
+                    result.retrieval_confidence = 1.0
+                    self.stats['pdf_found'] += 1
+                    self.stats['source_hits']['sciencedirect'] += 1
+                    logger.info(f"Full-text found via ScienceDirect: {doi}")
+                    return result
+                if sd_result.get('pdf_url'):
+                    result.pdf_url = sd_result['pdf_url']
+                    result.pdf_source = 'sciencedirect'
+                    result.full_text_source = 'sciencedirect'
+                    result.retrieval_confidence = 1.0
+                    self.stats['pdf_found'] += 1
+                    self.stats['source_hits']['sciencedirect'] += 1
+                    logger.info(f"PDF found via ScienceDirect: {doi}")
+                    return result
+
+        # 2. Try Unpaywall
         if self.unpaywall_email:
             pdf_url = self._try_unpaywall(doi)
             if pdf_url:
@@ -598,6 +631,40 @@ class BiblioHunter:
                 return result
 
         return result
+
+    def _try_sciencedirect(self, doi: str) -> Optional[Dict]:
+        """Try to get full-text from ScienceDirect (Elsevier)."""
+        try:
+            import asyncio
+            from api.sciencedirect import ScienceDirectClient
+
+            client = ScienceDirectClient(
+                api_key=self.scopus_api_key,
+                inst_token=self.elsevier_inst_token
+            )
+
+            # Run async method synchronously
+            loop = asyncio.new_event_loop()
+            try:
+                result = loop.run_until_complete(
+                    client.get_article_by_doi(doi, full_text=True)
+                )
+            finally:
+                loop.close()
+
+            if result:
+                return {
+                    'full_text': result.get('full_text'),
+                    'pdf_url': result.get('pdf_url'),
+                    'abstract': result.get('abstract'),
+                }
+
+        except ImportError:
+            logger.debug("ScienceDirect client not available")
+        except Exception as e:
+            logger.debug(f"ScienceDirect error for {doi}: {e}")
+
+        return None
 
     def _try_openalex(self, doi: str) -> Optional[str]:
         """Try to get PDF from OpenAlex."""

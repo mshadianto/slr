@@ -26,7 +26,8 @@ docker run -p 8501:8501 -e ANTHROPIC_API_KEY=sk-ant-... muezza-ai
 Create `.env` file (copy from `.env.example`):
 ```env
 ANTHROPIC_API_KEY=sk-ant-...          # Required for screening/quality/narrative
-SCOPUS_API_KEY=your_scopus_key        # Required for Scopus search
+SCOPUS_API_KEY=your_scopus_key        # Required for Scopus search + ScienceDirect
+ELSEVIER_INST_TOKEN=your_inst_token   # Optional (for off-campus ScienceDirect access)
 SEMANTIC_SCHOLAR_API_KEY=your_s2_key  # Recommended (higher rate limits)
 UNPAYWALL_EMAIL=your@email.com        # Recommended for PDF waterfall
 CORE_API_KEY=your_core_key            # Optional
@@ -76,8 +77,8 @@ from api.biblio_hunter import BiblioHunter, hunt_paper
 paper = hunt_paper("10.1038/nature12373")
 ```
 
-**Waterfall Order** (10 sources + fallback):
-1. Semantic Scholar OA → 2. Unpaywall → 3. OpenAlex → 4. Crossref → 5. DOAJ → 6. PubMed Central → 7. CORE → 8. ArXiv → 9. Google Scholar → 10. Virtual Full-Text (fallback)
+**Waterfall Order** (11 sources + fallback):
+1. ScienceDirect (Elsevier full-text) → 2. Semantic Scholar OA → 3. Unpaywall → 4. OpenAlex → 5. Crossref → 6. DOAJ → 7. PubMed Central → 8. CORE → 9. ArXiv → 10. Google Scholar → 11. Virtual Full-Text (fallback)
 
 **Virtual Full-Text**: When no PDF is available, synthesizes content from TL;DR, abstract, citation contexts (up to 15 snippets), related papers, and key references.
 
@@ -85,6 +86,7 @@ paper = hunt_paper("10.1038/nature12373")
 
 Each client handles its own rate limiting and error recovery:
 - `scopus.py` - Elsevier Scopus Search API (5000 req/week, 9/sec)
+- `sciencedirect.py` - Elsevier ScienceDirect full-text API (requires institutional access)
 - `semantic_scholar.py` - Paper metadata and citations (100 req/5min without key)
 - `unpaywall.py` - Open access PDF discovery (100K req/day)
 - `openalex.py` - OpenAlex API (250M+ works, 100K req/day, free)
