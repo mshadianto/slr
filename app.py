@@ -1594,6 +1594,76 @@ def render_agent_card(icon: str, name: str, description: str, status: AgentStatu
     """, unsafe_allow_html=True)
 
 
+def generate_prisma_narrative(stats: PRISMAStats, research_question: str = "") -> str:
+    """Generate PRISMA narrative in formal Indonesian academic style."""
+
+    identified = stats.identified
+    duplicates = stats.duplicates_removed
+    after_duplicates = identified - duplicates
+    screened = stats.screened or after_duplicates
+    excluded_screening = stats.excluded_screening
+    sought = stats.sought_retrieval or (screened - excluded_screening)
+    not_retrieved = stats.not_retrieved
+    retrieved = sought - not_retrieved
+    assessed = stats.assessed_eligibility or retrieved
+    excluded_eligibility = stats.excluded_eligibility
+    included = stats.included_synthesis or (assessed - excluded_eligibility)
+
+    # Calculate percentages
+    dup_pct = (duplicates / identified * 100) if identified > 0 else 0
+    screen_exc_pct = (excluded_screening / screened * 100) if screened > 0 else 0
+    retrieval_pct = (retrieved / sought * 100) if sought > 0 else 0
+    inclusion_pct = (included / identified * 100) if identified > 0 else 0
+
+    # Topic context from research question
+    topic_context = ""
+    if research_question:
+        # Extract key topic for context
+        topic_context = f" terkait topik penelitian yang ditetapkan"
+
+    narrative = f"""### Proses Seleksi Studi (PRISMA 2020)
+
+Proses seleksi studi dalam tinjauan sistematis ini mengikuti pedoman **PRISMA 2020** (*Preferred Reporting Items for Systematic Reviews and Meta-Analyses*){topic_context}. Pencarian literatur dilakukan secara komprehensif melalui basis data Scopus dan sumber-sumber akademik lainnya.
+
+#### Tahap Identifikasi
+
+Hasil pencarian awal mengidentifikasi sebanyak **{identified:,} artikel** dari berbagai sumber basis data. Setelah dilakukan penghapusan duplikat menggunakan algoritma *fuzzy matching*, diperoleh **{after_duplicates:,} artikel unik** untuk dilakukan skrining lebih lanjut. Proses deduplikasi berhasil menghapus **{duplicates:,} artikel** ({dup_pct:.1f}%) yang teridentifikasi sebagai duplikat.
+
+#### Tahap Skrining
+
+Pada tahap skrining judul dan abstrak, sebanyak **{screened:,} artikel** dievaluasi berdasarkan kriteria inklusi dan eksklusi yang telah ditetapkan. Proses skrining dilakukan dengan bantuan kecerdasan buatan (*AI-assisted screening*) untuk memastikan konsistensi dan efisiensi. Dari proses ini, **{excluded_screening:,} artikel** ({screen_exc_pct:.1f}%) dieksklusi karena tidak memenuhi kriteria kelayakan awal.
+
+#### Tahap Pengambilan Teks Lengkap
+
+Selanjutnya, dilakukan pencarian teks lengkap (*full-text retrieval*) terhadap **{sought:,} artikel** yang lolos skrining awal. Sistem *BiblioHunter* dengan strategi *waterfall* digunakan untuk mengakses dokumen dari berbagai sumber termasuk Semantic Scholar, Unpaywall, OpenAlex, dan repositori akses terbuka lainnya. """
+
+    if not_retrieved > 0:
+        narrative += f"Dari jumlah tersebut, **{not_retrieved:,} artikel** tidak dapat diperoleh teks lengkapnya karena kendala akses atau ketersediaan dokumen. "
+
+    narrative += f"Sebanyak **{retrieved:,} artikel** ({retrieval_pct:.1f}%) berhasil diperoleh dan dinilai kelayakannya secara menyeluruh."
+
+    narrative += f"""
+
+#### Tahap Penilaian Kelayakan
+
+Pada tahap penilaian kelayakan akhir, **{assessed:,} artikel** dievaluasi secara mendalam menggunakan kerangka *JBI Critical Appraisal*. Penilaian mencakup aspek desain studi, ukuran sampel, metodologi, dan kualitas pelaporan hasil. """
+
+    if excluded_eligibility > 0:
+        narrative += f"Sebanyak **{excluded_eligibility:,} artikel** dieksklusi pada tahap ini karena tidak memenuhi kriteria metodologis atau substansial yang dipersyaratkan."
+
+    narrative += f"""
+
+#### Hasil Akhir
+
+Dengan demikian, sebanyak **{included:,} artikel** memenuhi seluruh kriteria dan diikutsertakan dalam sintesis kualitatif tinjauan sistematis ini. Tingkat inklusi akhir adalah **{inclusion_pct:.1f}%** dari total artikel yang teridentifikasi pada pencarian awal.
+
+---
+*Narasi ini dihasilkan secara otomatis berdasarkan data PRISMA 2020 oleh Muezza AI.*
+"""
+
+    return narrative
+
+
 def render_metric_card(value: int, label: str, icon: str):
     """Render a PRISMA metric card."""
     st.markdown(f"""
@@ -2059,6 +2129,17 @@ def main():
             width="stretch",
             config={'displayModeBar': False}
         )
+
+        # PRISMA Narrative
+        if stats.identified > 0:
+            with st.expander("📝 **Narasi PRISMA (Proses Seleksi Studi)**", expanded=False):
+                prisma_narrative = generate_prisma_narrative(stats, st.session_state.get('research_question', ''))
+                st.markdown(prisma_narrative)
+
+                # Copy button
+                if st.button("📋 Copy Narasi", key="copy_prisma"):
+                    st.code(prisma_narrative, language=None)
+                    st.success("Narasi siap di-copy!")
 
     with main_col2:
         st.markdown("""
