@@ -35,18 +35,19 @@ import pandas as pd
 import asyncio
 
 # Only apply nest_asyncio if not using uvloop (Railway uses uvloop)
-def _is_uvloop():
-    try:
-        loop = asyncio.get_event_loop()
-        return 'uvloop' in type(loop).__module__
-    except RuntimeError:
-        return False
+# Check policy type instead of loop to avoid triggering nest_asyncio patches
+_using_uvloop = False
+try:
+    _policy = asyncio.get_event_loop_policy()
+    _using_uvloop = 'uvloop' in type(_policy).__module__
+except Exception:
+    pass
 
-if not _is_uvloop():
+if not _using_uvloop:
     try:
         import nest_asyncio
         nest_asyncio.apply()
-    except (ValueError, ImportError):
+    except (ValueError, ImportError, RuntimeError):
         pass
 import time
 import json
