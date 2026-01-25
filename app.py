@@ -33,11 +33,21 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import asyncio
-import nest_asyncio
-try:
-    nest_asyncio.apply()  # Allow nested event loops for Streamlit compatibility
-except ValueError:
-    pass  # uvloop doesn't need patching and is incompatible with nest_asyncio
+
+# Only apply nest_asyncio if not using uvloop (Railway uses uvloop)
+def _is_uvloop():
+    try:
+        loop = asyncio.get_event_loop()
+        return 'uvloop' in type(loop).__module__
+    except RuntimeError:
+        return False
+
+if not _is_uvloop():
+    try:
+        import nest_asyncio
+        nest_asyncio.apply()
+    except (ValueError, ImportError):
+        pass
 import time
 import json
 import os
