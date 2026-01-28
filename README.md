@@ -6,7 +6,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-0.2+-green.svg)](https://github.com/langchain-ai/langgraph)
-[![Version](https://img.shields.io/badge/version-2.2.0-gold.svg)](https://github.com/mshadianto/slr)
+[![Version](https://img.shields.io/badge/version-2.3.0-gold.svg)](https://github.com/mshadianto/slr)
 
 **Muezza AI** automates the systematic literature review (SLR) process using a multi-agent architecture powered by LangGraph. It implements PRISMA 2020 guidelines with intelligent paper retrieval, screening, quality assessment, and **automated academic writing in formal Indonesian**.
 
@@ -58,12 +58,14 @@
 - **Citation Auto-Stitcher** - Automatically match author names with bibliography from Scopus
 - **Logic Continuity Agent** - Ensure "benang merah" (red thread) across all chapters
 - **Forensic Audit Agent** - Verify every citation against source database
+- **AI Priority Screening** - Rayyan-style 1-5 star ratings with active learning (scikit-learn), requires 50+ screening decisions
+- **PRISMA 2020 Exclusion Tracking** - 10 structured exclusion categories with 40+ predefined reasons, custom reason support, export-ready statistics
 
 ### BiblioHunter - Intelligent Paper Retrieval
 - **Multi-identifier support** - DOI, ArXiv ID, PMID, Semantic Scholar ID, Title search
 - **Waterfall PDF retrieval** - 11 sources: ScienceDirect → Semantic Scholar → Unpaywall → OpenAlex → Crossref → DOAJ → PubMed Central → CORE → ArXiv → Google Scholar → Virtual Full-Text
 - **Virtual Full-Text** - TL;DR + Abstract + Citation Contexts + Related Papers (fallback for paywalled papers)
-- **In-memory caching** - 9000x+ speedup on repeated requests
+- **Enhanced caching** - Hybrid LRU/LFU eviction, adaptive TTL, compression for large entries, 9000x+ speedup
 - **Parallel batch processing** - Configurable workers with progress callbacks
 - **Quality scoring** - 0-1 score based on confidence and content completeness
 
@@ -80,6 +82,7 @@
 - **Citation Verification Modal**
 - **Tabbed Drafting Preview** (Bab I - Bab V)
 - **Professional Word Export** with title page
+- **Bilingual Interface** - Full Indonesian/English support (155+ translated strings)
 
 ### PRISMA 2020 Compliance
 - Automatic PRISMA flow diagram generation
@@ -314,6 +317,44 @@ generator.generate_report(
 )
 ```
 
+### AI Priority Screening
+
+```python
+from agents import ScreeningPriorityAgent
+
+agent = ScreeningPriorityAgent()
+
+# Requires 50+ screening decisions before computing ratings
+if agent.can_compute_ratings(total_decisions=55):
+    ratings = await agent.compute_ratings(
+        pending_papers=pending,
+        included_papers=included,
+        excluded_papers=excluded
+    )
+    # Returns ScreeningRating objects with 1-5 star ratings and confidence scores
+    for r in ratings:
+        print(f"{r.paper_doi}: {'★' * int(r.rating)} ({r.confidence:.2f})")
+```
+
+### Exclusion Reason Manager
+
+```python
+from agents import ExclusionReasonManager, ExclusionCategory
+
+manager = ExclusionReasonManager(language="id")
+
+# Record a structured exclusion
+manager.record_exclusion(
+    paper_doi="10.1000/example",
+    paper_title="Example Paper",
+    category=ExclusionCategory.STUDY_DESIGN,
+    reason_key="reason_review_only"
+)
+
+# Get PRISMA-ready statistics by category
+stats = manager.get_exclusion_statistics()
+```
+
 ---
 
 ## Project Structure
@@ -341,7 +382,9 @@ Muezza-AI/
 │   ├── citation_stitcher.py      # Auto citation matching
 │   ├── logic_continuity_agent.py # Report coherence checker
 │   ├── forensic_audit_agent.py   # Citation verification
-│   └── docx_generator.py         # Professional Word export
+│   ├── docx_generator.py         # Professional Word export
+│   ├── screening_priority_agent.py # AI priority ratings (active learning)
+│   └── exclusion_reasons.py      # PRISMA 2020 exclusion tracking
 │
 ├── api/                          # External API clients
 │   ├── biblio_hunter.py          # Waterfall paper retrieval engine
@@ -358,7 +401,11 @@ Muezza-AI/
 │   ├── google_scholar.py         # Google Scholar fallback
 │   ├── pdf_processor.py          # PDF extraction (PyMuPDF, pdfplumber)
 │   ├── query_translator.py       # Indonesian → English translation
-│   └── search_cache.py           # LRU cache with TTL
+│   ├── search_cache.py           # Hybrid LRU/LFU cache with adaptive TTL
+│   └── connection_pool.py        # HTTP connection pooling & rate limiting
+│
+├── utils/                        # Utility modules
+│   └── i18n.py                   # Bilingual text strings (ID/EN)
 │
 └── rag/                          # RAG components
     └── chromadb_store.py         # Vector store for semantic search
@@ -387,10 +434,11 @@ Muezza-AI/
 
 | Metric | Value |
 |--------|-------|
-| Cache speedup | 9000x+ |
+| Cache speedup | 9000x+ (hybrid LRU/LFU with compression) |
 | Parallel workers | 3 (configurable) |
-| API rate limiting | Automatic |
+| API rate limiting | Automatic (centralized connection pool) |
 | Success rate (with VFT) | ~95%+ |
+| AI Priority Screening | Requires 50+ decisions, then instant ratings |
 
 ### Typical SLR Processing
 
@@ -408,6 +456,7 @@ Muezza-AI/
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.3.0 | 2026-01-25 | AI Priority Screening, PRISMA 2020 Exclusion Tracking, Bilingual i18n, Connection Pooling, Enhanced Cache |
 | 2.2.0 | 2026-01-24 | Expanded waterfall (OpenAlex, Crossref, PubMed), Citation Network & Context Analysis |
 | 2.1.0 | 2026-01-22 | Add developer info, dynamic versioning |
 | 2.0.0 | 2026-01-22 | Complete UI redesign as Muezza AI |
@@ -456,7 +505,7 @@ If you use Muezza AI in your research, please cite:
   title = {Muezza AI: Faithful Research Companion for Automated Systematic Literature Reviews},
   year = {2026},
   url = {https://github.com/mshadianto/slr},
-  version = {2.2.0}
+  version = {2.3.0}
 }
 ```
 
