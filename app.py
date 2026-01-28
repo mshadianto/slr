@@ -14,11 +14,11 @@ import streamlit as st
 # ============================================================================
 # APPLICATION METADATA
 # ============================================================================
-__version__ = "2.2.0"
+__version__ = "2.3.0"
 __author__ = "MS Hadianto"
 __app_name__ = "Muezza AI"
 __tagline__ = "Faithful Research Companion"
-__release_date__ = "2026-01-24"
+__release_date__ = "2026-01-28"
 
 APP_INFO = {
     "name": __app_name__,
